@@ -43,3 +43,13 @@ const userSchema = new Schema<IUser>({
     },
 },
 {timestamps:true})
+userSchema.pre('save',async function(){
+    if(!this.isModified('password')) return;
+    this.password = await bcrypt.hash(this.password,12)
+})
+
+userSchema.methods.comparePassword = async function (enteredPassword:string): Promise<boolean>{
+    return await bcrypt.compare(enteredPassword,this.password);
+}
+
+export const User = model<IUser>('user',userSchema);
