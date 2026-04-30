@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 dotenv.config()
 import type{Request,Response,NextFunction} from 'express'
-import {User} from '../models/user.model.js'
+import {User,UserRole} from '../models/user.model.js'
 import jwt from 'jsonwebtoken'
 
 export const protect = async(req:Request,res:Response,next:NextFunction)=>{
@@ -25,11 +25,26 @@ if(!currentUser){
     res.status(401).json({message:"user no longer exists"})
 }
 
- (req as any).user = currentUser;
- 
+(req as any).user = currentUser;
+
 next()
 
  }catch(error:any){
-
+ res.status(500).json({message:error.message})
  } 
+}
+
+
+export const restrictTo = (...roles:[UserRole])=>{
+    return (req:Request,res:Response,next:NextFunction)=>{
+        const user = (req as any).user;
+
+        if(!roles.includes(user.role)){
+            res.status(403).json({
+            status: 'fail',
+            message: "you do not have access to perform this action"
+            })
+        }
+        next()
+    }
 }
