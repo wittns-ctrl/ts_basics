@@ -1,0 +1,135 @@
+import React, { useState } from 'react';
+import { User, Lock, Camera } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { usersApi } from '../../services/api';
+import './dashboard.css';
+
+const ProfilePage = () => {
+  const { user, loginWithCredentials } = useAuth();
+  const [tab, setTab] = useState('profile');
+  const [message, setMessage] = useState('');
+  const [profile, setProfile] = useState({
+    firstName: user?.name?.split(' ')[0] || '',
+    lastName: user?.name?.split(' ').slice(1).join(' ') || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    deliveryAddress: user?.deliveryAddress?.street || '',
+  });
+  const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+
+  const handleSaveProfile = async () => {
+    if (!user?.id) return;
+    await usersApi.update(user.id, {
+      name: `${profile.firstName} ${profile.lastName}`.trim(),
+      email: profile.email,
+      phone: Number(String(profile.phone).replace(/\D/g, '')) || profile.phone,
+      deliveryAddress: { street: profile.deliveryAddress },
+    });
+    setMessage('Profile updated successfully');
+  };
+
+  const handleChangePassword = async () => {
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      setMessage('Passwords do not match');
+      return;
+    }
+    await usersApi.changePassword(user.id, {
+      currentPassword: passwords.currentPassword,
+      newPassword: passwords.newPassword,
+    });
+    setMessage('Password changed successfully');
+    setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  };
+
+  return (
+    <>
+      <div className="page-header">
+        <h1>My Profile</h1>
+        <p>Manage your personal information and security settings.</p>
+      </div>
+
+      {message && <p style={{ color: '#4caf80', marginBottom: '1rem' }}>{message}</p>}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem' }}>
+        <div>
+          <div className="dash-panel" style={{ textAlign: 'center' }}>
+            <div style={{ position:'relative', display:'inline-block', marginBottom:'1rem' }}>
+              <div style={{ width:90, height:90, borderRadius:'50%', background:'linear-gradient(135deg,var(--dash-accent,#C6F135),#9fd420)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'2.5rem', fontWeight:700, color:'#000', margin:'0 auto' }}>
+                {user?.name?.charAt(0) || 'U'}
+              </div>
+              <button style={{ position:'absolute', bottom:0, right:0, width:30, height:30, borderRadius:'50%', background:'var(--dash-accent,#C6F135)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <Camera size={14} color="#000" />
+              </button>
+            </div>
+            <div style={{ fontWeight:700, color:'var(--text-main)', fontSize:'1.1rem' }}>{user?.name || 'Customer'}</div>
+            <div style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginTop:'0.25rem' }}>{user?.email}</div>
+            <div style={{ marginTop:'0.75rem', background:'var(--dash-accent-dim,rgba(198,241,53,0.12))', borderRadius:8, padding:'0.4rem 0.8rem', display:'inline-block', color:'var(--dash-accent,#C6F135)', fontSize:'0.8rem', fontWeight:600 }}>Customer</div>
+            <div style={{ marginTop:'1rem', color:'var(--text-muted)', fontSize:'0.8rem' }}>Member since {user?.joinDate || '2026'}</div>
+          </div>
+
+          <div className="dash-panel">
+            <div className="tab-bar" style={{ flexDirection:'column', border:'none' }}>
+              <button className={`tab-btn ${tab==='profile'?'active':''}`} style={{ textAlign:'left', borderBottom:'none', borderLeft: tab==='profile' ? '2px solid var(--dash-accent,#C6F135)' : '2px solid transparent', borderRadius:0, paddingLeft:'1rem' }} onClick={() => setTab('profile')}>
+                <User size={16} style={{marginRight:8}} /> Edit Profile
+              </button>
+              <button className={`tab-btn ${tab==='password'?'active':''}`} style={{ textAlign:'left', borderBottom:'none', borderLeft: tab==='password' ? '2px solid var(--dash-accent,#C6F135)' : '2px solid transparent', borderRadius:0, paddingLeft:'1rem' }} onClick={() => setTab('password')}>
+                <Lock size={16} style={{marginRight:8}} /> Change Password
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="dash-panel">
+          {tab === 'profile' && (
+            <>
+              <h3 style={{ color:'var(--text-main)', marginBottom:'1.75rem', fontWeight:600 }}>Update Profile Information</h3>
+              <div className="form-row">
+                <div className="dash-form-group">
+                  <label>First Name</label>
+                  <input className="dash-input" value={profile.firstName} onChange={e => setProfile(p => ({ ...p, firstName: e.target.value }))} />
+                </div>
+                <div className="dash-form-group">
+                  <label>Last Name</label>
+                  <input className="dash-input" value={profile.lastName} onChange={e => setProfile(p => ({ ...p, lastName: e.target.value }))} />
+                </div>
+              </div>
+              <div className="dash-form-group">
+                <label>Email Address</label>
+                <input className="dash-input" type="email" value={profile.email} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} />
+              </div>
+              <div className="dash-form-group">
+                <label>Phone Number</label>
+                <input className="dash-input" type="tel" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
+              </div>
+              <div className="dash-form-group">
+                <label>Delivery Address</label>
+                <input className="dash-input" value={profile.deliveryAddress} onChange={e => setProfile(p => ({ ...p, deliveryAddress: e.target.value }))} />
+              </div>
+              <button className="dash-btn-primary" onClick={handleSaveProfile}>Save Changes</button>
+            </>
+          )}
+          {tab === 'password' && (
+            <>
+              <h3 style={{ color:'var(--text-main)', marginBottom:'1.75rem', fontWeight:600 }}>Change Password</h3>
+              <div className="dash-form-group">
+                <label>Current Password</label>
+                <input className="dash-input" type="password" value={passwords.currentPassword} onChange={e => setPasswords(p => ({ ...p, currentPassword: e.target.value }))} />
+              </div>
+              <div className="dash-form-group">
+                <label>New Password</label>
+                <input className="dash-input" type="password" value={passwords.newPassword} onChange={e => setPasswords(p => ({ ...p, newPassword: e.target.value }))} />
+              </div>
+              <div className="dash-form-group">
+                <label>Confirm New Password</label>
+                <input className="dash-input" type="password" value={passwords.confirmPassword} onChange={e => setPasswords(p => ({ ...p, confirmPassword: e.target.value }))} />
+              </div>
+              <button className="dash-btn-primary" onClick={handleChangePassword}>Update Password</button>
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default ProfilePage;
