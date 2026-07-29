@@ -60,6 +60,10 @@ export const AuthProvider = ({ children }) => {
     return res;
   }, [persistAuth]);
 
+  const resendOtp = useCallback(async (email) => {
+    return authApi.resendOtp(email);
+  }, []);
+
   const logout = useCallback(async () => {
     const email = user?.email;
     try {
@@ -82,6 +86,7 @@ export const AuthProvider = ({ children }) => {
       enterAs,
       signup,
       verifyOtp,
+      resendOtp,
       loading,
       isAuthenticated: !!user,
       isDemoMode: false,

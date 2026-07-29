@@ -1,7 +1,31 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { mailApi } from "../services/api";
+import img1 from "../assets/images/restaurant_interior.png";
 import "../styles/landing.css";
 
 export default function Landing() {
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSent, setContactSent] = useState(false);
+  const [contactError, setContactError] = useState('');
+
+  const handleContact = async (e) => {
+    e.preventDefault();
+    setContactError('');
+    try {
+      await mailApi.contact({
+        fullName: contactName,
+        email: contactEmail,
+        message: contactMessage,
+      });
+      setContactSent(true);
+    } catch (err) {
+      setContactError(err.message || 'Failed to send message');
+    }
+  };
+
   return (
     <div className="landing">
 
@@ -33,7 +57,7 @@ export default function Landing() {
           </button>
 
           <motion.img
-            src="/food.png"
+            src={img1}
             className="food-image"
             animate={{
               y: [0, -15, 0],
@@ -89,18 +113,40 @@ export default function Landing() {
               Why Choose SupaMeal
             </h2>
 
-            <input placeholder="Name" />
+            {contactSent ? (
+              <p style={{ color: '#4caf80', textAlign: 'center' }}>Message sent successfully!</p>
+            ) : (
+              <form onSubmit={handleContact}>
+                <input
+                  placeholder="Name"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  required
+                />
 
-            <input placeholder="Email Address" />
+                <input
+                  type="email"
+                  placeholder="Email Address"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  required
+                />
 
-            <textarea
-              rows="5"
-              placeholder="Message"
-            />
+                <textarea
+                  rows="5"
+                  placeholder="Message"
+                  value={contactMessage}
+                  onChange={(e) => setContactMessage(e.target.value)}
+                  required
+                />
 
-            <button className="gold-button">
-              Send Message
-            </button>
+                {contactError && <p style={{ color: '#e05555', fontSize: '0.85rem' }}>{contactError}</p>}
+
+                <button type="submit" className="gold-button">
+                  Send Message
+                </button>
+              </form>
+            )}
 
           </div>
 

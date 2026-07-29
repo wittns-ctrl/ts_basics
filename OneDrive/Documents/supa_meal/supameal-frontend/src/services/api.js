@@ -4,11 +4,13 @@ import { apiRequest } from '../api/client';
 export const authApi = {
   signup: (data) => apiRequest('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
   verifyOtp: (data) => apiRequest('/auth/verifyOtp', { method: 'POST', body: JSON.stringify(data) }),
-  login: (data) => apiRequest('/auth/Login', { method: 'POST', body: JSON.stringify(data) }),
+  resendOtp: (email) => apiRequest('/auth/resend-otp', { method: 'POST', body: JSON.stringify({ email }) }),
+  login: (data) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   forgot: (data) => apiRequest('/auth/forgot', { method: 'POST', body: JSON.stringify(data) }),
   reset: (data) => apiRequest('/auth/reset', { method: 'POST', body: JSON.stringify(data) }),
   logout: (data) => apiRequest('/auth/logout', { method: 'POST', body: JSON.stringify(data) }),
 };
+
 
 // Restaurants
 export const restaurantsApi = {

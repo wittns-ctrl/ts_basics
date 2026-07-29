@@ -22,14 +22,16 @@ const RegisterRestaurant = () => {
     setIsLoading(true);
     setError('');
     try {
-      await authApi.signup({
+      const signupRes = await authApi.signup({
         name: form.ownerName,
         email: form.businessEmail,
         password: form.password,
         phone: Number(form.contactNumber.replace(/\D/g, '')) || 0,
         role: 'owner',
       });
-      await loginWithCredentials(form.businessEmail, form.password);
+      if (!signupRes.user || !signupRes.accessToken) {
+        await loginWithCredentials(form.businessEmail, form.password);
+      }
       const user = JSON.parse(localStorage.getItem('user'));
       await restaurantsApi.register({
         name: form.restaurantName,

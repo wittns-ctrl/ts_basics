@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, ShieldCheck, UtensilsCrossed, Store, LogIn } from 'lucide-react';
+import { ChevronRight, ShieldCheck, UtensilsCrossed, Store, LogIn, Mail, Lock } from 'lucide-react';
 import AuthLayout from '../../layouts/AuthLayout';
 import Button from '../../components/Button/Button';
 import Loader from '../../components/Loader/Loader';
@@ -22,18 +22,26 @@ const ROLE_LABELS = {
 const Login = () => {
   const [role, setRole] = useState('customer');
   const [loading, setLoading] = useState(false);
-  const { enterAs } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const { enterAs, loginWithCredentials } = useAuth();
   const navigate = useNavigate();
 
   const handleSignIn = async (e) => {
     e.preventDefault();
+    setError('');
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter your email and password to sign in.');
+      return;
+    }
     setLoading(true);
     try {
-      await enterAs(role);
-      navigate(DASHBOARD_ROUTES[role], { replace: true });
+      const user = await loginWithCredentials(email.trim(), password);
+      const loggedInRole = user?.role === 'owner' ? 'restaurant_owner' : user?.role || role;
+      navigate(DASHBOARD_ROUTES[loggedInRole] || DASHBOARD_ROUTES[role], { replace: true });
     } catch (err) {
-      console.error('Login failed:', err);
-      alert(err.message || 'Login failed. Make sure the backend is running.');
+      setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -52,7 +60,25 @@ const Login = () => {
         <p>Select your account type to continue</p>
       </div>
 
+      {error && <p style={{ color: '#e05555', textAlign: 'center', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</p>}
+
       <form onSubmit={handleSignIn}>
+        <div className="auth-input-group">
+          <label>Email</label>
+          <div className="auth-input-wrapper">
+            <Mail size={18} className="auth-input-icon" />
+            <input type="email" placeholder="you@example.com" className="auth-input" value={email} onChange={e => setEmail(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="auth-input-group">
+          <label>Password</label>
+          <div className="auth-input-wrapper">
+            <Lock size={18} className="auth-input-icon" />
+            <input type="password" placeholder="Enter your password" className="auth-input" value={password} onChange={e => setPassword(e.target.value)} />
+          </div>
+        </div>
+
         <div className="auth-input-group">
           <label>I am a...</label>
           <div className="role-selector" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
@@ -80,7 +106,7 @@ const Login = () => {
           </div>
         </div>
 
-        <Button variant="primary" className="auth-submit-btn" type="submit">
+        <Button variant="primary" className="auth-submit-btn" type="submit" disabled={loading}>
           <LogIn size={18} style={{ marginRight: '8px' }} />
           Sign In as {ROLE_LABELS[role].label}
         </Button>

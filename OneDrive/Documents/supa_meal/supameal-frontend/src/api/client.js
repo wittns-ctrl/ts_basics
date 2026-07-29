@@ -15,12 +15,23 @@ export async function apiRequest(path, options = {}) {
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    throw new ApiError(err.message || 'Network error', 0);
+  }
 
-  const data = await res.json().catch(() => ({}));
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+
   if (!res.ok) {
     throw new ApiError(data.message || data.error || 'Request failed', res.status);
   }
