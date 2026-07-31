@@ -66,6 +66,7 @@ export const bookingsApi = {
 // Users
 export const usersApi = {
   get: (id) => apiRequest(`/users/${id}`),
+  getDashboardStats: (id) => apiRequest(`/users/${id}/dashboard-stats`),
   update: (id, data) => apiRequest(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   changePassword: (id, data) => apiRequest(`/users/${id}/password`, { method: 'PATCH', body: JSON.stringify(data) }),
   list: (params = {}) => {
@@ -87,6 +88,8 @@ export const reviewsApi = {
 // Notifications
 export const notificationsApi = {
   list: (userId) => apiRequest(`/notifications${userId ? `?userId=${userId}` : ''}`),
+  markRead: (id) => apiRequest(`/notifications/${id}/read`, { method: 'PATCH' }),
+  markAllRead: () => apiRequest('/notifications/read-all', { method: 'PATCH' }),
   dismiss: (id) => apiRequest(`/notifications/${id}`, { method: 'DELETE' }),
 };
 

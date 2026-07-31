@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, ShieldCheck, UtensilsCrossed, Store, LogIn, Mail, Lock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ChevronRight, ShieldCheck, UtensilsCrossed, Store, LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { FaGoogle, FaApple } from 'react-icons/fa';
 import AuthLayout from '../../layouts/AuthLayout';
 import Button from '../../components/Button/Button';
 import Loader from '../../components/Loader/Loader';
@@ -24,9 +25,18 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { enterAs, loginWithCredentials } = useAuth();
+  const { loginWithCredentials, loginWithGoogle, loginWithApple } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const oauthError = searchParams.get('error');
+    if (oauthError) {
+      setError(decodeURIComponent(oauthError.replace(/\+/g, ' ')));
+    }
+  }, [searchParams]);
 
   const handleSignIn = async (e) => {
     e.preventDefault();
@@ -60,22 +70,48 @@ const Login = () => {
         <p>Select your account type to continue</p>
       </div>
 
-      {error && <p style={{ color: '#e05555', textAlign: 'center', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</p>}
+      {error && <p className="auth-form-error">{error}</p>}
 
       <form onSubmit={handleSignIn}>
         <div className="auth-input-group">
           <label>Email</label>
           <div className="auth-input-wrapper">
             <Mail size={18} className="auth-input-icon" />
-            <input type="email" placeholder="you@example.com" className="auth-input" value={email} onChange={e => setEmail(e.target.value)} />
+            <input
+              type="email"
+              placeholder="you@example.com"
+              className="auth-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
           </div>
         </div>
 
         <div className="auth-input-group">
           <label>Password</label>
+          <Link to="/reset-password" className="auth-forgot-link">
+            Forgot password?
+          </Link>
           <div className="auth-input-wrapper">
             <Lock size={18} className="auth-input-icon" />
-            <input type="password" placeholder="Enter your password" className="auth-input" value={password} onChange={e => setPassword(e.target.value)} />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Enter your password"
+              className="auth-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="auth-input-action"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              tabIndex={-1}
+            >
+              {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+            </button>
           </div>
         </div>
 
@@ -111,6 +147,18 @@ const Login = () => {
           Sign In as {ROLE_LABELS[role].label}
         </Button>
       </form>
+
+      <div className="auth-form-divider">
+        <span>OR</span>
+      </div>
+
+      <button type="button" className="auth-social-btn" onClick={loginWithGoogle}>
+        <FaGoogle /> Continue with Google
+      </button>
+
+      <button type="button" className="auth-social-btn" onClick={loginWithApple}>
+        <FaApple /> Continue with Apple
+      </button>
 
       <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>Or explore public pages:</p>

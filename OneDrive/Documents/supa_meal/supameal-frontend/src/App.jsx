@@ -12,6 +12,7 @@ import Login from './pages/auth/Login';
 import SignUp from './pages/auth/SignUp';
 import ResetPassword from './pages/auth/ResetPassword';
 import VerifyOtp from './pages/auth/VerifyOtp';
+import OAuthCallback from './pages/auth/OAuthCallback';
 
 // Public forms
 import BookTable from './pages/booking/BookTable';
@@ -39,11 +40,13 @@ function App() {
         <Route path="/restaurants" element={<PT><Restaurants /></PT>} />
         <Route path="/restaurants/:id" element={<PT><RestaurantDetails /></PT>} />
 
-        {/* Demo onboarding flows */}
+        {/* Auth / onboarding flows */}
         <Route path="/login" element={<PT><Login /></PT>} />
         <Route path="/signup" element={<PT><SignUp /></PT>} />
         <Route path="/reset-password" element={<PT><ResetPassword /></PT>} />
+        <Route path="/forgot-password" element={<PT><ResetPassword /></PT>} />
         <Route path="/verify-otp" element={<PT><VerifyOtp /></PT>} />
+        <Route path="/auth/callback" element={<PT><OAuthCallback /></PT>} />
 
         {/* Public feature pages */}
         <Route path="/book-table" element={<PT><BookTable /></PT>} />

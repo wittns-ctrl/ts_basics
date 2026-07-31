@@ -5,9 +5,11 @@ import { usersApi } from '../../services/api';
 import './dashboard.css';
 
 const ProfilePage = () => {
-  const { user, loginWithCredentials } = useAuth();
+  const { user, updateUser } = useAuth();
   const [tab, setTab] = useState('profile');
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState({
     firstName: user?.name?.split(' ')[0] || '',
     lastName: user?.name?.split(' ').slice(1).join(' ') || '',
@@ -19,26 +21,56 @@ const ProfilePage = () => {
 
   const handleSaveProfile = async () => {
     if (!user?.id) return;
-    await usersApi.update(user.id, {
-      name: `${profile.firstName} ${profile.lastName}`.trim(),
-      email: profile.email,
-      phone: Number(String(profile.phone).replace(/\D/g, '')) || profile.phone,
-      deliveryAddress: { street: profile.deliveryAddress },
-    });
-    setMessage('Profile updated successfully');
+    setLoading(true);
+    setMessage('');
+    setError('');
+    try {
+      const newName = `${profile.firstName} ${profile.lastName}`.trim();
+      const updated = await usersApi.update(user.id, {
+        name: newName,
+        email: profile.email,
+        phone: Number(String(profile.phone).replace(/\D/g, '')) || profile.phone,
+        deliveryAddress: { street: profile.deliveryAddress },
+      });
+      updateUser({
+        ...updated,
+        name: newName,
+        email: profile.email,
+        phone: profile.phone,
+        deliveryAddress: { street: profile.deliveryAddress },
+      });
+      setMessage('Profile updated successfully!');
+    } catch (err) {
+      setError(err?.message || 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChangePassword = async () => {
+    setMessage('');
+    setError('');
     if (passwords.newPassword !== passwords.confirmPassword) {
-      setMessage('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
-    await usersApi.changePassword(user.id, {
-      currentPassword: passwords.currentPassword,
-      newPassword: passwords.newPassword,
-    });
-    setMessage('Password changed successfully');
-    setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    if (!passwords.currentPassword || !passwords.newPassword) {
+      setError('Please fill in all password fields');
+      return;
+    }
+    setLoading(true);
+    try {
+      await usersApi.changePassword(user.id, {
+        currentPassword: passwords.currentPassword,
+        newPassword: passwords.newPassword,
+      });
+      setMessage('Password changed successfully!');
+      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      setError(err?.message || 'Failed to change password');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -48,7 +80,8 @@ const ProfilePage = () => {
         <p>Manage your personal information and security settings.</p>
       </div>
 
-      {message && <p style={{ color: '#4caf80', marginBottom: '1rem' }}>{message}</p>}
+      {message && <p style={{ color: '#4caf80', marginBottom: '1rem', fontWeight: 600 }}>{message}</p>}
+      {error && <p style={{ color: '#f44336', marginBottom: '1rem', fontWeight: 600 }}>{error}</p>}
 
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem' }}>
         <div>

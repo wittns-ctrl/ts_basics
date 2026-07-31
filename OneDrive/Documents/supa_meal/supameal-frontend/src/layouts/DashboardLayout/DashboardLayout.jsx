@@ -1,25 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Menu, X, Moon, RefreshCw, Globe, Bell, ChevronRight,
-  LogOut, Home, Search, ChevronDown, User, CheckCircle, Package, Truck
+  Menu, X, Moon, Sun, Bell, ChevronRight, LogOut, Home, Search,
+  ChevronDown, User, CheckCircle, Package, Truck, CalendarCheck, Heart, UtensilsCrossed
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { notificationsApi, usersApi } from '../../services/api';
 import Logo from '../../components/Logo/Logo';
 import './DashboardLayout.css';
 
-const MOCK_NOTIFICATIONS = [
-  { id: 1, text: '56 new users registered today', time: 'Just now', unread: true, icon: User },
-  { id: 2, text: '132 orders placed this week', time: '10 min ago', unread: true, icon: Package },
-  { id: 3, text: 'Your order #2451 is on its way!', time: '25 min ago', unread: true, icon: Truck },
-  { id: 4, text: 'Table booking confirmed for 7 PM', time: '1 hour ago', unread: false, icon: CheckCircle },
-];
-
-const MOCK_ACTIVITIES = [
-  { id: 1, user: 'Alex J.', action: 'Placed order #2452', time: '5 min ago', avatar: 'A' },
-  { id: 2, user: 'System', action: 'Booking confirmed at The Golden Plate', time: '1 hour ago', avatar: 'S' },
-  { id: 3, user: 'Alex J.', action: 'Added Pasta Bella to favorites', time: '2 hours ago', avatar: 'A' },
-  { id: 4, user: 'Alex J.', action: 'Updated delivery address', time: 'Yesterday', avatar: 'A' },
+const SEARCH_TARGETS = [
+  { id: 'menu', label: 'Order Food / Menu', icon: UtensilsCrossed, type: 'Page' },
+  { id: 'cart', label: 'View Cart', icon: Package, type: 'Page' },
+  { id: 'book-table', label: 'Book a Table', icon: CalendarCheck, type: 'Action' },
+  { id: 'bookings', label: 'My Bookings', icon: CalendarCheck, type: 'Page' },
+  { id: 'orders', label: 'My Orders', icon: Truck, type: 'Page' },
+  { id: 'favorites', label: 'Favorite Restaurants', icon: Heart, type: 'Page' },
+  { id: 'profile', label: 'Edit Profile & Settings', icon: User, type: 'Settings' },
 ];
 
 const SidebarItem = ({ item, activeTab, setActiveTab, setSidebarOpen }) => {
@@ -79,10 +76,83 @@ const DashboardLayout = ({ children, activeTab, setActiveTab, sidebarConfig, rol
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Light / Dark Theme State
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchPopover, setShowSearchPopover] = useState(false);
+
+  // Notification State
+  const [showNotifPopover, setShowNotifPopover] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [activities, setActivities] = useState([]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  // Load user notifications and activities
+  useEffect(() => {
+    let isMounted = true;
+    const loadNotifsAndActivities = async () => {
+      if (!user?.id) return;
+      try {
+        const stats = await usersApi.getDashboardStats(user.id);
+        if (isMounted && stats) {
+          if (stats.notifications && stats.notifications.length > 0) {
+            setNotifications(stats.notifications);
+          } else {
+            // Default welcome notification if empty
+            setNotifications([
+              {
+                id: 'notif-welcome',
+                title: 'Welcome to SupaMeal! 👋',
+                text: 'Your account is ready. Explore our menu or book a table!',
+                time: 'Just now',
+                unread: true,
+              },
+            ]);
+          }
+
+          if (stats.activities && stats.activities.length > 0) {
+            setActivities(stats.activities);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load user notifications:', err);
+      }
+    };
+
+    loadNotifsAndActivities();
+    return () => { isMounted = false; };
+  }, [user?.id]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/');
   };
+
+  const markAllRead = async () => {
+    try {
+      await notificationsApi.markAllRead();
+      setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+    } catch {
+      setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+    }
+  };
+
+  const unreadCount = notifications.filter(n => n.unread).length;
+
+  // Filter search results
+  const searchResults = searchQuery.trim()
+    ? SEARCH_TARGETS.filter(t => t.label.toLowerCase().includes(searchQuery.toLowerCase()))
+    : [];
 
   // Find current breadcrumb
   let currentBreadcrumb = 'Overview';
@@ -158,17 +228,108 @@ const DashboardLayout = ({ children, activeTab, setActiveTab, sidebarConfig, rol
           </div>
 
           <div className="topbar-right">
-            <div className="topbar-search">
+            {/* SEARCH INPUT */}
+            <div className="topbar-search" style={{ position: 'relative' }}>
               <Search size={16} />
-              <input type="text" placeholder="Search..." />
+              <input 
+                type="text" 
+                placeholder="Search feature or page..." 
+                value={searchQuery}
+                onChange={e => {
+                  setSearchQuery(e.target.value);
+                  setShowSearchPopover(true);
+                }}
+                onFocus={() => setShowSearchPopover(true)}
+              />
+              {showSearchPopover && searchQuery.trim() && (
+                <div className="topbar-popover" style={{ left: 0, right: 'auto' }}>
+                  <div className="popover-header">
+                    <h4>Search Results</h4>
+                    <button className="link-btn" onClick={() => setShowSearchPopover(false)}>Close</button>
+                  </div>
+                  <div className="popover-body">
+                    {searchResults.length === 0 ? (
+                      <div style={{ padding: '1rem', color: 'var(--dash-muted)', fontSize: '0.85rem' }}>
+                        No matching features found
+                      </div>
+                    ) : (
+                      searchResults.map(item => {
+                        const Icon = item.icon;
+                        return (
+                          <div 
+                            key={item.id} 
+                            className="popover-item"
+                            onClick={() => {
+                              setActiveTab(item.id);
+                              setShowSearchPopover(false);
+                              setSearchQuery('');
+                            }}
+                          >
+                            <Icon size={18} color="var(--dash-accent)" />
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--dash-text)' }}>{item.label}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--dash-muted)' }}>{item.type}</div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-            <button className="topbar-icon-btn" aria-label="Toggle theme">
-              <Moon size={18} />
+
+            {/* LIGHT/DARK THEME TOGGLE */}
+            <button className="topbar-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}>
+              {theme === 'dark' ? <Sun size={18} color="#FFD700" /> : <Moon size={18} />}
             </button>
-            <button className="topbar-icon-btn notif-btn" aria-label="Notifications">
-              <Bell size={18} />
-              <span className="notif-dot" />
-            </button>
+
+            {/* NOTIFICATION BELL BUTTON */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                className="topbar-icon-btn notif-btn" 
+                aria-label="Notifications"
+                onClick={() => setShowNotifPopover(!showNotifPopover)}
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && <span className="notif-badge-count">{unreadCount}</span>}
+              </button>
+
+              {/* NOTIFICATION DROPDOWN POPOVER */}
+              {showNotifPopover && (
+                <div className="topbar-popover">
+                  <div className="popover-header">
+                    <h4>Notifications</h4>
+                    {unreadCount > 0 && (
+                      <button className="link-btn" style={{ fontSize: '0.75rem' }} onClick={markAllRead}>
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="popover-body">
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--dash-muted)', fontSize: '0.85rem' }}>
+                        No notifications
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} className={`popover-item ${n.unread ? 'unread' : ''}`}>
+                          <div className="notif-icon-circle">
+                            <Bell size={14} color="var(--dash-accent)" />
+                          </div>
+                          <div className="notif-body">
+                            <p><strong>{n.title || 'Notice'}</strong>: {n.text}</p>
+                            <span>{n.time}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* USER PROFILE SHORTCUT */}
             <div className="topbar-user" onClick={() => setActiveTab(sidebarConfig.some(i => i.id === 'profile') ? 'profile' : 'overview')}>
               <div className="user-avatar-sm">
                 {user?.name?.charAt(0) ?? 'U'}
@@ -187,32 +348,33 @@ const DashboardLayout = ({ children, activeTab, setActiveTab, sidebarConfig, rol
       <aside className="dashboard-right-sidebar">
         <div className="right-sidebar-section">
           <h4>Notifications</h4>
-          {MOCK_NOTIFICATIONS.map(n => {
-            const Icon = n.icon;
-            return (
-              <div key={n.id} className={`notif-item ${n.unread ? 'unread' : ''}`}>
-                <div className="notif-icon-circle"><Icon size={16} /></div>
-                <div className="notif-body">
-                  <p>{n.text}</p>
-                  <span>{n.time}</span>
-                </div>
+          {notifications.slice(0, 4).map(n => (
+            <div key={n.id} className={`notif-item ${n.unread ? 'unread' : ''}`}>
+              <div className="notif-icon-circle"><Bell size={16} /></div>
+              <div className="notif-body">
+                <p><strong>{n.title}</strong> {n.text}</p>
+                <span>{n.time}</span>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
         <div className="right-sidebar-section">
-          <h4>Activities</h4>
+          <h4>Recent Activities</h4>
           <div className="activities-list">
-            {MOCK_ACTIVITIES.map(a => (
-              <div key={a.id} className="activity-item">
-                <div className="activity-avatar">{a.avatar}</div>
-                <div className="activity-body">
-                  <p><strong>{a.user}</strong> {a.action}</p>
-                  <span>{a.time}</span>
+            {activities.length === 0 ? (
+              <p style={{ color: 'var(--dash-muted)', fontSize: '0.8rem' }}>No recent activities.</p>
+            ) : (
+              activities.map(a => (
+                <div key={a.id} className="activity-item">
+                  <div className="activity-avatar">{a.avatar}</div>
+                  <div className="activity-body">
+                    <p><strong>{a.user}</strong> {a.action}</p>
+                    <span>{a.time}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </aside>

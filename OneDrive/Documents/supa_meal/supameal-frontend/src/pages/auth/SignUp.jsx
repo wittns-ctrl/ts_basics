@@ -12,7 +12,7 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', password: '' });
-  const { signup } = useAuth();
+  const { signup, loginWithGoogle, loginWithApple } = useAuth();
   const navigate = useNavigate();
 
   const handleSignUp = async (e) => {
@@ -47,7 +47,7 @@ const SignUp = () => {
         <p>Let's get you started</p>
       </div>
 
-      {error && <p style={{ color: '#e05555', textAlign: 'center', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</p>}
+      {error && <p className="auth-form-error">{error}</p>}
 
       <form onSubmit={handleSignUp}>
         <div className="auth-input-group">
@@ -93,6 +93,7 @@ const SignUp = () => {
               type="button" 
               className="auth-input-action"
               onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
@@ -108,11 +109,11 @@ const SignUp = () => {
         <span>OR</span>
       </div>
 
-      <button type="button" className="auth-social-btn">
+      <button type="button" className="auth-social-btn" onClick={loginWithGoogle}>
         <FaGoogle /> Continue with Google
       </button>
       
-      <button type="button" className="auth-social-btn">
+      <button type="button" className="auth-social-btn" onClick={loginWithApple}>
         <FaApple /> Continue with Apple
       </button>
 

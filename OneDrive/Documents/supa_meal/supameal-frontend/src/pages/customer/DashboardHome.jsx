@@ -1,23 +1,52 @@
-import React from 'react';
-import { Link } from 'react-router-dom'; // keeping Link for now, but in SPA it might be better to pass setActiveTab
+import React, { useState, useEffect } from 'react';
 import { Package, CalendarCheck, Heart, TrendingUp, Clock, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { usersApi } from '../../services/api';
 import './dashboard.css';
 import img1 from '../../assets/images/restaurant_interior.png';
 
-const RECENT_ORDERS = [
-  { id: '#2451', name: 'Grilled Salmon + Pasta Bella', status: 'on-way', statusLabel: 'On the Way', time: '20 min ETA', price: '$34.00' },
-  { id: '#2448', name: 'Truffle Burger + Fries', status: 'delivered', statusLabel: 'Delivered', time: 'Yesterday', price: '$18.50' },
-  { id: '#2440', name: 'Vegan Bowl + Juice', status: 'delivered', statusLabel: 'Delivered', time: '3 days ago', price: '$15.00' },
-];
-
-const UPCOMING_BOOKINGS = [
-  { id: 1, restaurant: 'The Golden Plate', date: 'Tue, 10 Jun', time: '7:00 PM', guests: 2, status: 'confirmed' },
-  { id: 2, restaurant: 'Sushi Master', date: 'Fri, 13 Jun', time: '8:30 PM', guests: 4, status: 'pending' },
-];
-
 const DashboardHome = ({ setActiveTab }) => {
   const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    ordersThisMonth: '+0 this month',
+    upcomingBookingsCount: 0,
+    nextBookingText: 'None',
+    favoritesCount: 0,
+    avgRatingGiven: 0,
+    reviewsCount: 0,
+    recentOrders: [],
+    upcomingBookings: [],
+    favoriteRestaurants: [],
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStats = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await usersApi.getDashboardStats(user.id);
+        if (isMounted && res) {
+          setStats(res);
+        }
+      } catch (err) {
+        console.error('Failed to load dashboard stats:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchStats();
+    return () => { isMounted = false; };
+  }, [user?.id]);
+
+  const recentOrders = stats.recentOrders || [];
+  const upcomingBookings = stats.upcomingBookings || [];
+  const favoriteRestaurants = stats.favoriteRestaurants || [];
 
   return (
     <>
@@ -31,26 +60,26 @@ const DashboardHome = ({ setActiveTab }) => {
         <div className="stat-card">
           <div className="stat-card-icon"><Package size={22} /></div>
           <div className="stat-card-label">Total Orders</div>
-          <div className="stat-card-value">24</div>
-          <div className="stat-card-change up"><TrendingUp size={14} /> +3 this month</div>
+          <div className="stat-card-value">{loading ? '...' : stats.totalOrders}</div>
+          <div className="stat-card-change up"><TrendingUp size={14} /> {stats.ordersThisMonth}</div>
         </div>
         <div className="stat-card">
           <div className="stat-card-icon"><CalendarCheck size={22} /></div>
           <div className="stat-card-label">Upcoming Bookings</div>
-          <div className="stat-card-value">2</div>
-          <div className="stat-card-change neutral"><Clock size={14} /> Next: Tue 7PM</div>
+          <div className="stat-card-value">{loading ? '...' : stats.upcomingBookingsCount}</div>
+          <div className="stat-card-change neutral"><Clock size={14} /> {stats.nextBookingText}</div>
         </div>
         <div className="stat-card">
           <div className="stat-card-icon"><Heart size={22} /></div>
           <div className="stat-card-label">Favorites</div>
-          <div className="stat-card-value">8</div>
+          <div className="stat-card-value">{loading ? '...' : stats.favoritesCount}</div>
           <div className="stat-card-change neutral"><Star size={14} /> Saved restaurants</div>
         </div>
         <div className="stat-card">
           <div className="stat-card-icon"><Star size={22} /></div>
           <div className="stat-card-label">Avg. Rating Given</div>
-          <div className="stat-card-value">4.6</div>
-          <div className="stat-card-change up"><TrendingUp size={14} /> 12 reviews</div>
+          <div className="stat-card-value">{loading ? '...' : stats.avgRatingGiven}</div>
+          <div className="stat-card-change up"><TrendingUp size={14} /> {stats.reviewsCount} reviews</div>
         </div>
       </div>
 
@@ -61,23 +90,33 @@ const DashboardHome = ({ setActiveTab }) => {
             <h3>Recent Orders</h3>
             <button className="link-btn" onClick={() => setActiveTab('orders')}>View All</button>
           </div>
-          {RECENT_ORDERS.map(order => (
-            <div key={order.id} className="list-row">
-              <div className="list-row-left">
-                <div className="list-row-img" style={{ background: '#222', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <Package size={20} color="rgba(255,255,255,0.5)" />
-                </div>
-                <div>
-                  <div className="list-row-title">{order.name}</div>
-                  <div className="list-row-sub">{order.id} · {order.time}</div>
-                </div>
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'0.4rem' }}>
-                <span className={`status-badge status-${order.status}`}>{order.statusLabel}</span>
-                <span style={{ color: 'var(--dash-accent, #C6F135)', fontWeight: 600 }}>{order.price}</span>
-              </div>
+          {recentOrders.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
+              <Package size={36} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+              <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>No orders placed yet</p>
+              <button className="dash-btn-primary" onClick={() => setActiveTab('menu')}>
+                Explore Menu & Order
+              </button>
             </div>
-          ))}
+          ) : (
+            recentOrders.map(order => (
+              <div key={order.id} className="list-row">
+                <div className="list-row-left">
+                  <div className="list-row-img" style={{ background: 'var(--dash-border, #222)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <Package size={20} color="var(--text-muted, rgba(255,255,255,0.5))" />
+                  </div>
+                  <div>
+                    <div className="list-row-title">{order.name}</div>
+                    <div className="list-row-sub">{order.id} · {order.time}</div>
+                  </div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'0.4rem' }}>
+                  <span className={`status-badge status-${order.status}`}>{order.statusLabel}</span>
+                  <span style={{ color: 'var(--dash-accent, #C6F135)', fontWeight: 600 }}>{order.price}</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Upcoming Bookings */}
@@ -86,18 +125,30 @@ const DashboardHome = ({ setActiveTab }) => {
             <h3>Upcoming Bookings</h3>
             <button className="link-btn" onClick={() => setActiveTab('bookings')}>View All</button>
           </div>
-          {UPCOMING_BOOKINGS.map(b => (
-            <div key={b.id} className="list-row">
-              <div>
-                <div className="list-row-title">{b.restaurant}</div>
-                <div className="list-row-sub">{b.date} · {b.time} · {b.guests} guests</div>
-              </div>
-              <span className={`status-badge status-${b.status}`}>{b.status}</span>
+          {upcomingBookings.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
+              <CalendarCheck size={36} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+              <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>No upcoming table bookings</p>
+              <button className="dash-btn-primary" style={{ width:'100%' }} onClick={() => setActiveTab('book-table')}>
+                + New Booking
+              </button>
             </div>
-          ))}
-          <button className="dash-btn-primary" style={{ width:'100%', marginTop:'1.5rem' }} onClick={() => setActiveTab('book-table')}>
-            + New Booking
-          </button>
+          ) : (
+            <>
+              {upcomingBookings.map(b => (
+                <div key={b.id} className="list-row">
+                  <div>
+                    <div className="list-row-title">{b.restaurant}</div>
+                    <div className="list-row-sub">{b.date} · {b.time} · {b.guests} guests</div>
+                  </div>
+                  <span className={`status-badge status-${b.status}`}>{b.status}</span>
+                </div>
+              ))}
+              <button className="dash-btn-primary" style={{ width:'100%', marginTop:'1.5rem' }} onClick={() => setActiveTab('book-table')}>
+                + New Booking
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -107,17 +158,24 @@ const DashboardHome = ({ setActiveTab }) => {
           <h3>Favorite Restaurants</h3>
           <button className="link-btn" onClick={() => setActiveTab('favorites')}>View All</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-          {['The Golden Plate', 'Pasta Bella', 'Sushi Master'].map((r, i) => (
-            <div key={i} className="fav-card" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', cursor:'pointer' }}>
-              <img src={img1} alt={r} style={{ width:'100%', height:'110px', objectFit:'cover' }} />
-              <div style={{ padding: '0.75rem' }}>
-                <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize:'0.9rem' }}>{r}</div>
-                <div style={{ color: 'var(--dash-accent, #C6F135)', fontSize:'0.8rem', marginTop:'0.25rem' }}>★ 4.8 · Fine Dining</div>
+        {favoriteRestaurants.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
+            <Heart size={36} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
+            <p style={{ fontSize: '0.9rem' }}>You haven't saved any favorite restaurants yet.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+            {favoriteRestaurants.map((r, i) => (
+              <div key={r.id || i} className="fav-card" onClick={() => setActiveTab('favorites')} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-color, rgba(255,255,255,0.06))', cursor:'pointer' }}>
+                <img src={r.image || img1} alt={r.name} style={{ width:'100%', height:'110px', objectFit:'cover' }} />
+                <div style={{ padding: '0.75rem' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize:'0.9rem' }}>{r.name}</div>
+                  <div style={{ color: 'var(--dash-accent, #C6F135)', fontSize:'0.8rem', marginTop:'0.25rem' }}>★ {r.rating || 4.5} · {r.cuisine || 'Fine Dining'}</div>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

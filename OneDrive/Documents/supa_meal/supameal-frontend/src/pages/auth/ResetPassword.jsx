@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Mail, ArrowLeft, KeyRound } from 'lucide-react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Mail, ArrowLeft, KeyRound, Eye, EyeOff, Lock } from 'lucide-react';
 import AuthLayout from '../../layouts/AuthLayout';
 import Button from '../../components/Button/Button';
 import { authApi } from '../../services/api';
@@ -8,9 +8,13 @@ import './AuthForm.css';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const token = searchParams.get('token');
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,9 +23,10 @@ const ResetPassword = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setMessage('');
     try {
-      const res = await authApi.forgot({ email });
-      setMessage(res.message || 'Reset link sent to your email');
+      const res = await authApi.forgot({ email: email.trim() });
+      setMessage(res.message || 'Reset link sent to your email. Check your inbox.');
     } catch (err) {
       setError(err.message || 'Failed to send reset link');
     } finally {
@@ -31,11 +36,23 @@ const ResetPassword = () => {
 
   const handleReset = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setMessage('');
+
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
     try {
       const res = await authApi.reset({ token, newPassword });
-      setMessage(res.message || 'Password reset successfully');
+      setMessage(res.message || 'Password reset successfully. You can sign in now.');
+      setTimeout(() => navigate('/login', { replace: true }), 2000);
     } catch (err) {
       setError(err.message || 'Failed to reset password');
     } finally {
@@ -50,12 +67,12 @@ const ResetPassword = () => {
     >
       <div className="auth-form-header">
         <KeyRound size={32} className="auth-form-icon" style={{ color: 'var(--primary)' }} />
-        <h3>{token ? 'Reset Password' : 'Reset Password'}</h3>
+        <h3>{token ? 'Reset Password' : 'Forgot Password'}</h3>
         <p>{token ? 'Choose a strong new password' : 'Enter your email to receive a reset link'}</p>
       </div>
 
-      {message && <p style={{ color: '#4caf80', textAlign: 'center', marginBottom: '1rem' }}>{message}</p>}
-      {error && <p style={{ color: '#e05555', textAlign: 'center', marginBottom: '1rem' }}>{error}</p>}
+      {message && <p className="auth-form-success">{message}</p>}
+      {error && <p className="auth-form-error">{error}</p>}
 
       <form onSubmit={token ? handleReset : handleForgot}>
         {!token ? (
@@ -63,17 +80,68 @@ const ResetPassword = () => {
             <label>Email Address</label>
             <div className="auth-input-wrapper">
               <Mail size={18} className="auth-input-icon" />
-              <input type="email" placeholder="john@example.com" className="auth-input" required value={email} onChange={e => setEmail(e.target.value)} />
+              <input
+                type="email"
+                placeholder="john@example.com"
+                className="auth-input"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
             </div>
           </div>
         ) : (
-          <div className="auth-input-group">
-            <label>New Password</label>
-            <div className="auth-input-wrapper">
-              <KeyRound size={18} className="auth-input-icon" />
-              <input type="password" placeholder="New password" className="auth-input" required value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+          <>
+            <div className="auth-input-group">
+              <label>New Password</label>
+              <div className="auth-input-wrapper">
+                <Lock size={18} className="auth-input-icon" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="New password"
+                  className="auth-input"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className="auth-input-action"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+                </button>
+              </div>
             </div>
-          </div>
+            <div className="auth-input-group">
+              <label>Confirm Password</label>
+              <div className="auth-input-wrapper">
+                <Lock size={18} className="auth-input-icon" />
+                <input
+                  type={showConfirm ? 'text' : 'password'}
+                  placeholder="Confirm new password"
+                  className="auth-input"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className="auth-input-action"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showConfirm ? <Eye size={18} /> : <EyeOff size={18} />}
+                </button>
+              </div>
+            </div>
+          </>
         )}
 
         <Button variant="primary" className="auth-submit-btn" type="submit" disabled={loading}>

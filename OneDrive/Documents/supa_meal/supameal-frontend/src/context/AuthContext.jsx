@@ -64,6 +64,26 @@ export const AuthProvider = ({ children }) => {
     return authApi.resendOtp(email);
   }, []);
 
+  const forgotPassword = useCallback(async (email) => {
+    return authApi.forgot({ email });
+  }, []);
+
+  const resetPassword = useCallback(async (token, newPassword) => {
+    return authApi.reset({ token, newPassword });
+  }, []);
+
+  const getApiBaseUrl = useCallback(() => {
+    return (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+  }, []);
+
+  const loginWithGoogle = useCallback(() => {
+    window.location.href = `${getApiBaseUrl()}/auth/google`;
+  }, [getApiBaseUrl]);
+
+  const loginWithApple = useCallback(() => {
+    window.location.href = `${getApiBaseUrl()}/auth/apple`;
+  }, [getApiBaseUrl]);
+
   const logout = useCallback(async () => {
     const email = user?.email;
     try {
@@ -77,16 +97,30 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('refreshToken');
   }, [user]);
 
+  const updateUser = useCallback((updatedUserData) => {
+    setUser((prev) => {
+      const newUser = { ...prev, ...updatedUserData };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider value={{
       user,
+      updateUser,
       login,
       loginWithCredentials,
+      loginWithGoogle,
+      loginWithApple,
+      persistAuth,
       logout,
       enterAs,
       signup,
       verifyOtp,
       resendOtp,
+      forgotPassword,
+      resetPassword,
       loading,
       isAuthenticated: !!user,
       isDemoMode: false,
