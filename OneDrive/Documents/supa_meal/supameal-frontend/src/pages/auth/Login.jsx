@@ -6,6 +6,7 @@ import AuthLayout from '../../layouts/AuthLayout';
 import Button from '../../components/Button/Button';
 import Loader from '../../components/Loader/Loader';
 import { useAuth } from '../../context/AuthContext';
+import { authApi } from '../../services/api';
 import './AuthForm.css';
 
 const DASHBOARD_ROUTES = {
@@ -23,6 +24,8 @@ const ROLE_LABELS = {
 const Login = () => {
   const [role, setRole] = useState('customer');
   const [loading, setLoading] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -37,6 +40,25 @@ const Login = () => {
       setError(decodeURIComponent(oauthError.replace(/\+/g, ' ')));
     }
   }, [searchParams]);
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setForgotMessage('');
+    if (!email.trim()) {
+      setError('Please enter your email to reset your password.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await authApi.forgot({ email: email.trim() });
+      setForgotMessage(res.message || 'Reset link sent to your email. Check your inbox.');
+    } catch (err) {
+      setError(err.message || 'Failed to send reset link');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignIn = async (e) => {
     e.preventDefault();
@@ -61,92 +83,120 @@ const Login = () => {
 
   return (
     <AuthLayout
-      title="Welcome back to SupaMeal"
-      subtitle="Sign in to access your dashboard."
+      title={isForgotPassword ? "Reset Your Password" : "Welcome back to SupaMeal"}
+      subtitle={isForgotPassword ? "We'll send you a secure reset link." : "Sign in to access your dashboard."}
     >
       <div className="auth-form-header">
         <LogIn size={32} className="auth-form-icon" style={{ color: 'var(--primary)' }} />
-        <h3>Sign In</h3>
-        <p>Select your account type to continue</p>
+        <h3>{isForgotPassword ? "Forgot Password" : "Sign In"}</h3>
+        <p>{isForgotPassword ? "Enter your email to receive a reset link" : "Select your account type to continue"}</p>
       </div>
 
       {error && <p className="auth-form-error">{error}</p>}
+      {forgotMessage && <p className="auth-form-success" style={{ color: 'green', fontSize: '0.9rem', marginBottom: '1rem', textAlign: 'center' }}>{forgotMessage}</p>}
 
-      <form onSubmit={handleSignIn}>
-        <div className="auth-input-group">
-          <label>Email</label>
-          <div className="auth-input-wrapper">
-            <Mail size={18} className="auth-input-icon" />
-            <input
-              type="email"
-              placeholder="you@example.com"
-              className="auth-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
+      {isForgotPassword ? (
+        <form onSubmit={handleForgotPassword}>
+          <div className="auth-input-group">
+            <label>Email Address</label>
+            <div className="auth-input-wrapper">
+              <Mail size={18} className="auth-input-icon" />
+              <input
+                type="email"
+                placeholder="you@example.com"
+                className="auth-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
           </div>
-        </div>
-
-        <div className="auth-input-group">
-          <label>Password</label>
-          <Link to="/reset-password" className="auth-forgot-link">
-            Forgot password?
-          </Link>
-          <div className="auth-input-wrapper">
-            <Lock size={18} className="auth-input-icon" />
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Enter your password"
-              className="auth-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-            <button
-              type="button"
-              className="auth-input-action"
-              onClick={() => setShowPassword(!showPassword)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              tabIndex={-1}
-            >
-              {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+          <Button variant="primary" className="auth-submit-btn" type="submit" disabled={loading}>
+            Send Reset Link
+          </Button>
+          <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+            <button type="button" onClick={() => { setIsForgotPassword(false); setError(''); setForgotMessage(''); }} className="auth-forgot-link" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>
+              Back to Sign In
             </button>
           </div>
-        </div>
+        </form>
+      ) : (
+        <form onSubmit={handleSignIn}>
+          <div className="auth-input-group">
+            <label>Email</label>
+            <div className="auth-input-wrapper">
+              <Mail size={18} className="auth-input-icon" />
+              <input
+                type="email"
+                placeholder="you@example.com"
+                className="auth-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+          </div>
 
-        <div className="auth-input-group">
-          <label>I am a...</label>
-          <div className="role-selector" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            {Object.entries(ROLE_LABELS).map(([r, { label, icon: Icon }]) => (
+          <div className="auth-input-group">
+            <label>Password</label>
+            <button type="button" onClick={() => { setIsForgotPassword(true); setError(''); }} className="auth-forgot-link" style={{ background: 'none', border: 'none', cursor: 'pointer', float: 'right' }}>
+              Forgot password?
+            </button>
+            <div className="auth-input-wrapper">
+              <Lock size={18} className="auth-input-icon" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your password"
+                className="auth-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
               <button
                 type="button"
-                key={r}
-                className={`role-btn ${role === r ? 'active' : ''}`}
-                onClick={() => setRole(r)}
-                style={{
-                  padding: '0.75rem 0.5rem',
-                  fontSize: '0.78rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  height: '80px',
-                }}
+                className="auth-input-action"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
               >
-                <Icon size={20} />
-                {label}
+                {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
               </button>
-            ))}
+            </div>
           </div>
-        </div>
 
-        <Button variant="primary" className="auth-submit-btn" type="submit" disabled={loading}>
-          <LogIn size={18} style={{ marginRight: '8px' }} />
-          Sign In as {ROLE_LABELS[role].label}
-        </Button>
-      </form>
+          <div className="auth-input-group">
+            <label>I am a...</label>
+            <div className="role-selector" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              {Object.entries(ROLE_LABELS).map(([r, { label, icon: Icon }]) => (
+                <button
+                  type="button"
+                  key={r}
+                  className={`role-btn ${role === r ? 'active' : ''}`}
+                  onClick={() => setRole(r)}
+                  style={{
+                    padding: '0.75rem 0.5rem',
+                    fontSize: '0.78rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    height: '80px',
+                  }}
+                >
+                  <Icon size={20} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Button variant="primary" className="auth-submit-btn" type="submit" disabled={loading}>
+            <LogIn size={18} style={{ marginRight: '8px' }} />
+            Sign In as {ROLE_LABELS[role].label}
+          </Button>
+        </form>
+      )}
 
       <div className="auth-form-divider">
         <span>OR</span>
