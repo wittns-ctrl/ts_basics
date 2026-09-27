@@ -1,25 +1,21 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { authApi } from '../services/api';
 
 const AuthContext = createContext(null);
 
+const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes — refresh halfway through a 15-min token
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const refreshTimer = useRef(null);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('user');
-    const token = localStorage.getItem('accessToken');
-    if (stored && token) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem('user');
-        localStorage.removeItem('accessToken');
-      }
+  const clearRefreshTimer = () => {
+    if (refreshTimer.current) {
+      clearInterval(refreshTimer.current);
+      refreshTimer.current = null;
     }
-    setLoading(false);
-  }, []);
+  };
 
   const persistAuth = useCallback((authUser, accessToken, refreshToken) => {
     setUser(authUser);
@@ -27,6 +23,53 @@ export const AuthProvider = ({ children }) => {
     if (accessToken) localStorage.setItem('accessToken', accessToken);
     if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
   }, []);
+
+  const refreshToken = useCallback(async () => {
+    const stored = localStorage.getItem('refreshToken');
+    if (!stored) return false;
+    try {
+      const res = await authApi.refresh(stored);
+      persistAuth(res.user, res.accessToken, res.refreshToken);
+      return true;
+    } catch (err) {
+      setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      clearRefreshTimer();
+      return false;
+    }
+  }, [persistAuth]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    const access = localStorage.getItem('accessToken');
+    const refresh = localStorage.getItem('refreshToken');
+
+    const init = async () => {
+      if (stored && access) {
+        try {
+          setUser(JSON.parse(stored));
+        } catch {
+          localStorage.removeItem('user');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        }
+      } else if (refresh) {
+        await refreshToken();
+      }
+      setLoading(false);
+    };
+    init();
+  }, [refreshToken]);
+
+  useEffect(() => {
+    clearRefreshTimer();
+    if (user && localStorage.getItem('refreshToken')) {
+      refreshTimer.current = setInterval(refreshToken, REFRESH_INTERVAL_MS);
+    }
+    return clearRefreshTimer;
+  }, [user, refreshToken]);
 
   const loginWithCredentials = useCallback(async (email, password) => {
     const res = await authApi.login({ email, password });
@@ -91,6 +134,7 @@ export const AuthProvider = ({ children }) => {
     } catch {
       // ignore logout API errors
     }
+    clearRefreshTimer();
     setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('accessToken');
@@ -121,6 +165,7 @@ export const AuthProvider = ({ children }) => {
       resendOtp,
       forgotPassword,
       resetPassword,
+      refreshToken,
       loading,
       isAuthenticated: !!user,
       isDemoMode: false,

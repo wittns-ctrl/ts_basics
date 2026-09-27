@@ -6,6 +6,7 @@ export const authApi = {
   verifyOtp: (data) => apiRequest('/auth/verifyOtp', { method: 'POST', body: JSON.stringify(data) }),
   resendOtp: (email) => apiRequest('/auth/resend-otp', { method: 'POST', body: JSON.stringify({ email }) }),
   login: (data) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  refresh: (refreshToken) => apiRequest('/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken }), skipAuth: true }),
   forgot: (data) => apiRequest('/auth/forgot', { method: 'POST', body: JSON.stringify(data) }),
   reset: (data) => apiRequest('/auth/reset', { method: 'POST', body: JSON.stringify(data) }),
   logout: (data) => apiRequest('/auth/logout', { method: 'POST', body: JSON.stringify(data) }),
@@ -105,6 +106,20 @@ export const adminApi = {
 // Promos & Mail
 export const promosApi = {
   validate: (code) => apiRequest('/promos/validate', { method: 'POST', body: JSON.stringify({ code }) }),
+};
+
+// Payments
+export const paymentsApi = {
+  createIntent: (orderId, metadata) =>
+    apiRequest('/payments/create-intent', {
+      method: 'POST',
+      body: JSON.stringify({ orderId, metadata }),
+    }),
+  confirm: (paymentIntentId) =>
+    apiRequest('/payments/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ paymentIntentId }),
+    }),
 };
 
 export const mailApi = {

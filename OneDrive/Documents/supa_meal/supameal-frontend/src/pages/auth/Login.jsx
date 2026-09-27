@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronRight, ShieldCheck, UtensilsCrossed, Store, LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { FaGoogle, FaApple } from 'react-icons/fa';
+import { FaGoogle } from 'react-icons/fa';
 import AuthLayout from '../../layouts/AuthLayout';
 import Button from '../../components/Button/Button';
 import Loader from '../../components/Loader/Loader';
@@ -30,7 +30,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { loginWithCredentials, loginWithGoogle, loginWithApple } = useAuth();
+  const { loginWithCredentials, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -204,10 +204,6 @@ const Login = () => {
 
       <button type="button" className="auth-social-btn" onClick={loginWithGoogle}>
         <FaGoogle /> Continue with Google
-      </button>
-
-      <button type="button" className="auth-social-btn" onClick={loginWithApple}>
-        <FaApple /> Continue with Apple
       </button>
 
       <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>

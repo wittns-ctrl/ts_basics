@@ -613,14 +613,11 @@ const AdminDashboard = () => {
     loadAdminData();
   };
 
-  const { enterAs, isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   useEffect(() => {
-    const init = async () => {
-      if (!isAuthenticated) await enterAs('admin').catch(() => {});
-      loadAdminData();
-    };
-    init();
-  }, [isAuthenticated]);
+    if (!isAuthenticated || !user) return;
+    loadAdminData();
+  }, [isAuthenticated, user]);
 
   const renderContent = () => {
     switch (activeTab) {

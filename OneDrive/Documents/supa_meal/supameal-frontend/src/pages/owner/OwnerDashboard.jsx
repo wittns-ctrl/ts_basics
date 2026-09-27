@@ -762,7 +762,7 @@ const OwnerDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [orders, setOrders] = useState([]);
 
-  const { user, enterAs, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   const loadOwnerData = async (ownerId, restId) => {
     if (!restId) return;
@@ -786,7 +786,6 @@ const OwnerDashboard = () => {
 
   useEffect(() => {
     const init = async () => {
-      if (!isAuthenticated) await enterAs('restaurant_owner').catch(() => {});
       const ownerId = user?.id;
       if (!ownerId) return;
       try {

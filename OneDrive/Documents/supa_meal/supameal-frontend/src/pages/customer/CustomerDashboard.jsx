@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { LayoutDashboard, CalendarCheck, UtensilsCrossed, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -45,11 +45,8 @@ const customerSidebarConfig = [
 const CustomerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [trackingOrderId, setTrackingOrderId] = useState('2452');
-  const { enterAs, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { cartCount } = useCart();
-  useEffect(() => {
-    if (!isAuthenticated) enterAs('customer').catch(() => {});
-  }, [enterAs, isAuthenticated]);
 
   const sidebarWithBadges = customerSidebarConfig.map(item => {
     if (item.subItems) {

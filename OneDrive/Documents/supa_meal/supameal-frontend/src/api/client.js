@@ -8,17 +8,18 @@ class ApiError extends Error {
 }
 
 export async function apiRequest(path, options = {}) {
+  const { skipAuth, headers: extraHeaders, ...rest } = options;
   const token = localStorage.getItem('accessToken');
   const headers = {
     'Content-Type': 'application/json',
-    ...(options.headers || {}),
+    ...(extraHeaders || {}),
   };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (!skipAuth && token) headers.Authorization = `Bearer ${token}`;
 
   let res;
   try {
     res = await fetch(`${API_URL}${path}`, {
-      ...options,
+      ...rest,
       headers,
     });
   } catch (err) {

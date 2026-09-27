@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Menu, X, Moon, Sun, Bell, ChevronRight, LogOut, Home, Search,
+  Menu, X, Bell, ChevronRight, LogOut, Home, Search,
   ChevronDown, User, CheckCircle, Package, Truck, CalendarCheck, Heart, UtensilsCrossed
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -18,6 +18,29 @@ const SEARCH_TARGETS = [
   { id: 'favorites', label: 'Favorite Restaurants', icon: Heart, type: 'Page' },
   { id: 'profile', label: 'Edit Profile & Settings', icon: User, type: 'Settings' },
 ];
+
+const getAvatarLabel = (name) => {
+  if (!name) return 'U';
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'U';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+};
+
+const UserAvatar = ({ user, className = 'user-avatar-sm' }) => {
+  const avatarSrc = user?.profile?.imageurl || user?.imageurl || '';
+  const label = getAvatarLabel(user?.name);
+
+  return (
+    <div className={className}>
+      {avatarSrc ? (
+        <img className="user-avatar-image" src={avatarSrc} alt={user?.name || 'User avatar'} />
+      ) : (
+        label
+      )}
+    </div>
+  );
+};
 
 const SidebarItem = ({ item, activeTab, setActiveTab, setSidebarOpen }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -76,9 +99,6 @@ const DashboardLayout = ({ children, activeTab, setActiveTab, sidebarConfig, rol
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Light / Dark Theme State
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
-
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchPopover, setShowSearchPopover] = useState(false);
@@ -89,9 +109,9 @@ const DashboardLayout = ({ children, activeTab, setActiveTab, sidebarConfig, rol
   const [activities, setActivities] = useState([]);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('theme', 'dark');
+  }, []);
 
   // Load user notifications and activities
   useEffect(() => {
@@ -128,10 +148,6 @@ const DashboardLayout = ({ children, activeTab, setActiveTab, sidebarConfig, rol
     loadNotifsAndActivities();
     return () => { isMounted = false; };
   }, [user?.id]);
-
-  const toggleTheme = () => {
-    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
-  };
 
   const handleLogout = () => {
     logout();
@@ -179,9 +195,7 @@ const DashboardLayout = ({ children, activeTab, setActiveTab, sidebarConfig, rol
         </div>
 
         <div className="sidebar-user">
-          <div className="user-avatar-sm">
-            {user?.name?.charAt(0) ?? 'U'}
-          </div>
+          <UserAvatar user={user} />
           <div className="user-info-sm">
             <span className="user-name-sm">{user?.name || 'User'}</span>
             <span className="user-role-sm">{roleName}</span>
@@ -279,11 +293,6 @@ const DashboardLayout = ({ children, activeTab, setActiveTab, sidebarConfig, rol
               )}
             </div>
 
-            {/* LIGHT/DARK THEME TOGGLE */}
-            <button className="topbar-icon-btn" onClick={toggleTheme} aria-label="Toggle theme" title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}>
-              {theme === 'dark' ? <Sun size={18} color="#FFD700" /> : <Moon size={18} />}
-            </button>
-
             {/* NOTIFICATION BELL BUTTON */}
             <div style={{ position: 'relative' }}>
               <button 
@@ -331,9 +340,7 @@ const DashboardLayout = ({ children, activeTab, setActiveTab, sidebarConfig, rol
 
             {/* USER PROFILE SHORTCUT */}
             <div className="topbar-user" onClick={() => setActiveTab(sidebarConfig.some(i => i.id === 'profile') ? 'profile' : 'overview')}>
-              <div className="user-avatar-sm">
-                {user?.name?.charAt(0) ?? 'U'}
-              </div>
+              <UserAvatar user={user} />
               <span>{user?.name || 'User'}</span>
             </div>
           </div>

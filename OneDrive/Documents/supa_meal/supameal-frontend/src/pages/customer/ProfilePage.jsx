@@ -1,23 +1,65 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { User, Lock, Camera } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usersApi } from '../../services/api';
 import './dashboard.css';
 
+const getProfileForm = (user) => ({
+  firstName: user?.name?.split(' ')[0] || '',
+  lastName: user?.name?.split(' ').slice(1).join(' ') || '',
+  email: user?.email || '',
+  phone: user?.phone ? String(user.phone) : '',
+  deliveryAddress: user?.deliveryAddress?.street || '',
+});
+
+const getAvatarLabel = (name) => {
+  if (!name) return 'U';
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'U';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+};
+
 const ProfilePage = () => {
   const { user, updateUser } = useAuth();
+  const fileInputRef = useRef(null);
   const [tab, setTab] = useState('profile');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [profile, setProfile] = useState({
-    firstName: user?.name?.split(' ')[0] || '',
-    lastName: user?.name?.split(' ').slice(1).join(' ') || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    deliveryAddress: user?.deliveryAddress?.street || '',
-  });
+  const [profile, setProfile] = useState(() => getProfileForm(user));
+  const [avatarPreview, setAvatarPreview] = useState(user?.profile?.imageurl || user?.imageurl || '');
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const displayName = `${profile.firstName} ${profile.lastName}`.trim() || user?.name || 'Customer';
+  const avatarLabel = getAvatarLabel(displayName);
+
+  useEffect(() => {
+    setProfile(getProfileForm(user));
+    setAvatarPreview(user?.profile?.imageurl || user?.imageurl || '');
+  }, [user]);
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose a valid image file.');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Profile picture must be 2MB or smaller.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarPreview(typeof reader.result === 'string' ? reader.result : '');
+      setError('');
+      setMessage('Profile picture ready. Save changes to keep it.');
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSaveProfile = async () => {
     if (!user?.id) return;
@@ -26,11 +68,16 @@ const ProfilePage = () => {
     setError('');
     try {
       const newName = `${profile.firstName} ${profile.lastName}`.trim();
+      const nextProfile = {
+        ...(user?.profile || {}),
+        imageurl: avatarPreview || '',
+      };
       const updated = await usersApi.update(user.id, {
         name: newName,
         email: profile.email,
         phone: Number(String(profile.phone).replace(/\D/g, '')) || profile.phone,
         deliveryAddress: { street: profile.deliveryAddress },
+        profile: nextProfile,
       });
       updateUser({
         ...updated,
@@ -38,6 +85,7 @@ const ProfilePage = () => {
         email: profile.email,
         phone: profile.phone,
         deliveryAddress: { street: profile.deliveryAddress },
+        profile: nextProfile,
       });
       setMessage('Profile updated successfully!');
     } catch (err) {
@@ -87,17 +135,25 @@ const ProfilePage = () => {
         <div>
           <div className="dash-panel" style={{ textAlign: 'center' }}>
             <div style={{ position:'relative', display:'inline-block', marginBottom:'1rem' }}>
-              <div style={{ width:90, height:90, borderRadius:'50%', background:'linear-gradient(135deg,var(--dash-accent,#C6F135),#9fd420)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'2.5rem', fontWeight:700, color:'#000', margin:'0 auto' }}>
-                {user?.name?.charAt(0) || 'U'}
+              <div className="profile-summary-avatar">
+                {avatarPreview ? (
+                  <img className="profile-avatar-image" src={avatarPreview} alt={`${displayName} avatar`} />
+                ) : (
+                  avatarLabel
+                )}
               </div>
-              <button style={{ position:'absolute', bottom:0, right:0, width:30, height:30, borderRadius:'50%', background:'var(--dash-accent,#C6F135)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <button
+                type="button"
+                style={{ position:'absolute', bottom:0, right:0, width:30, height:30, borderRadius:'50%', background:'var(--dash-accent,#C6F135)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                onClick={() => fileInputRef.current?.click()}
+              >
                 <Camera size={14} color="#000" />
               </button>
             </div>
-            <div style={{ fontWeight:700, color:'var(--text-main)', fontSize:'1.1rem' }}>{user?.name || 'Customer'}</div>
-            <div style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginTop:'0.25rem' }}>{user?.email}</div>
+            <div style={{ fontWeight:700, color:'var(--text-main)', fontSize:'1.1rem' }}>{displayName}</div>
+            <div style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginTop:'0.25rem' }}>{profile.email || user?.email}</div>
             <div style={{ marginTop:'0.75rem', background:'var(--dash-accent-dim,rgba(198,241,53,0.12))', borderRadius:8, padding:'0.4rem 0.8rem', display:'inline-block', color:'var(--dash-accent,#C6F135)', fontSize:'0.8rem', fontWeight:600 }}>Customer</div>
-            <div style={{ marginTop:'1rem', color:'var(--text-muted)', fontSize:'0.8rem' }}>Member since {user?.joinDate || '2026'}</div>
+            <div style={{ marginTop:'1rem', color:'var(--text-muted)', fontSize:'0.8rem' }}>Member since {user?.joined || '2026'}</div>
           </div>
 
           <div className="dash-panel">
@@ -116,6 +172,36 @@ const ProfilePage = () => {
           {tab === 'profile' && (
             <>
               <h3 style={{ color:'var(--text-main)', marginBottom:'1.75rem', fontWeight:600 }}>Update Profile Information</h3>
+              <div className="dash-form-group">
+                <label>Profile Picture</label>
+                <div className="profile-avatar-editor">
+                  <div className="profile-avatar-preview">
+                    {avatarPreview ? (
+                      <img className="profile-avatar-image" src={avatarPreview} alt={`${displayName} avatar`} />
+                    ) : (
+                      avatarLabel
+                    )}
+                  </div>
+                  <div className="profile-avatar-actions">
+                    <button
+                      type="button"
+                      className="dash-btn-outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={loading}
+                    >
+                      Upload Picture
+                    </button>
+                    <p>PNG, JPG or WEBP up to 2MB.</p>
+                  </div>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleAvatarChange}
+                  style={{ display: 'none' }}
+                />
+              </div>
               <div className="form-row">
                 <div className="dash-form-group">
                   <label>First Name</label>
@@ -138,7 +224,9 @@ const ProfilePage = () => {
                 <label>Delivery Address</label>
                 <input className="dash-input" value={profile.deliveryAddress} onChange={e => setProfile(p => ({ ...p, deliveryAddress: e.target.value }))} />
               </div>
-              <button className="dash-btn-primary" onClick={handleSaveProfile}>Save Changes</button>
+              <button className="dash-btn-primary" onClick={handleSaveProfile} disabled={loading}>
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
             </>
           )}
           {tab === 'password' && (
@@ -156,7 +244,9 @@ const ProfilePage = () => {
                 <label>Confirm New Password</label>
                 <input className="dash-input" type="password" value={passwords.confirmPassword} onChange={e => setPasswords(p => ({ ...p, confirmPassword: e.target.value }))} />
               </div>
-              <button className="dash-btn-primary" onClick={handleChangePassword}>Update Password</button>
+              <button className="dash-btn-primary" onClick={handleChangePassword} disabled={loading}>
+                {loading ? 'Updating...' : 'Update Password'}
+              </button>
             </>
           )}
         </div>

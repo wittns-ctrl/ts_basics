@@ -1,65 +1,158 @@
 import React from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { ToastProvider } from './context/ToastContext';
+import { CartProvider } from './context/CartContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { NotificationsProvider } from './context/NotificationsContext';
+import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 
-// Public pages
 import LandingPage from './pages/LandingPage';
-import Restaurants from './pages/Restaurants/Restaurants';
-import RestaurantDetails from './pages/Restaurants/RestaurantDetails';
-
-// Auth / onboarding (demo navigation only)
 import Login from './pages/auth/Login';
 import SignUp from './pages/auth/SignUp';
+import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
-import VerifyOtp from './pages/auth/VerifyOtp';
+import VerifyEmail from './pages/VerifyEmail';
 import OAuthCallback from './pages/auth/OAuthCallback';
-
-// Public forms
-import BookTable from './pages/booking/BookTable';
-import RegisterRestaurant from './pages/owner/RegisterRestaurant';
-import OwnerLogin from './pages/owner/OwnerLogin';
-
-// Dashboards (open access — no auth gate)
+import RestaurantsPage from './pages/Restaurants/Restaurants';
+import RestaurantDetail from './pages/Restaurants/RestaurantDetails';
+import CartPage from './pages/customer/CartPage';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
+import MenuPage from './pages/customer/MenuPage';
+import CheckoutPage from './pages/customer/CheckoutPage';
+import OrderTrackingPage from './pages/customer/OrderTracking';
 import OwnerDashboard from './pages/owner/OwnerDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import NotFound from './pages/NotFound';
+import ProfilePage from './pages/customer/ProfilePage';
+import ReservationsPage from './pages/customer/ReservationsPage';
+import TestPage from './pages/TestPage';
 
-import PageTransition from './components/PageTransition/PageTransition';
+const ROLE_HOME = {
+  customer: '/customer/dashboard',
+  owner: '/owner/dashboard',
+  admin: '/admin/dashboard',
+};
 
-const PT = ({ children }) => <PageTransition>{children}</PageTransition>;
+const HomeRedirect = () => {
+  const { user, isAuthenticated } = useAuth();
+  if (isAuthenticated && user?.role && ROLE_HOME[user.role]) {
+    return <Navigate to={ROLE_HOME[user.role]} replace />;
+  }
+  return <LandingPage />;
+};
 
-function App() {
-  const location = useLocation();
+function AppRoutes() {
+  const { user, isAuthenticated } = useAuth();
+  const loginRedirect = isAuthenticated ? (
+    <Navigate to={ROLE_HOME[user?.role] || '/customer/dashboard'} replace />
+  ) : null;
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
+    <Routes>
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path="/home" element={<LandingPage />} />
+      <Route path="/restaurants" element={<RestaurantsPage />} />
+      <Route path="/restaurants/:id" element={<RestaurantDetail />} />
+      <Route path="/menu/:restaurantId" element={<MenuPage />} />
+      <Route
+        path="/login"
+        element={loginRedirect || <Login />}
+      />
+      <Route
+        path="/signup"
+        element={loginRedirect || <SignUp />}
+      />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/auth/callback" element={<OAuthCallback />} />
+      <Route path="/test" element={<TestPage />} />
+      <Route path="*" element={<NotFound />} />
 
-        {/* Public marketing */}
-        <Route path="/" element={<PT><LandingPage /></PT>} />
-        <Route path="/restaurants" element={<PT><Restaurants /></PT>} />
-        <Route path="/restaurants/:id" element={<PT><RestaurantDetails /></PT>} />
+      <Route
+        path="/customer/dashboard"
+        element={
+          <ProtectedRoute roles={['customer']}>
+            <CustomerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute roles={['customer', 'owner', 'admin']}>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cart"
+        element={
+          <ProtectedRoute roles={['customer']}>
+            <CartPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/checkout"
+        element={
+          <ProtectedRoute roles={['customer']}>
+            <CheckoutPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/order-tracking/:orderId"
+        element={
+          <ProtectedRoute roles={['customer', 'owner', 'admin']}>
+            <OrderTrackingPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reservations"
+        element={
+          <ProtectedRoute roles={['customer']}>
+            <ReservationsPage />
+          </ProtectedRoute>
+        }
+      />
 
-        {/* Auth / onboarding flows */}
-        <Route path="/login" element={<PT><Login /></PT>} />
-        <Route path="/signup" element={<PT><SignUp /></PT>} />
-        <Route path="/reset-password" element={<PT><ResetPassword /></PT>} />
-        <Route path="/forgot-password" element={<PT><ResetPassword /></PT>} />
-        <Route path="/verify-otp" element={<PT><VerifyOtp /></PT>} />
-        <Route path="/auth/callback" element={<PT><OAuthCallback /></PT>} />
+      <Route
+        path="/owner/dashboard"
+        element={
+          <ProtectedRoute roles={['owner']}>
+            <OwnerDashboard />
+          </ProtectedRoute>
+        }
+      />
 
-        {/* Public feature pages */}
-        <Route path="/book-table" element={<PT><BookTable /></PT>} />
-        <Route path="/register-restaurant" element={<PT><RegisterRestaurant /></PT>} />
-        <Route path="/owner-login" element={<PT><OwnerLogin /></PT>} />
+      <Route
+        path="/admin/dashboard"
+        element={
+          <ProtectedRoute roles={['admin']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  );
+}
 
-        {/* Dashboards — freely accessible */}
-        <Route path="/customer/dashboard" element={<PT><CustomerDashboard /></PT>} />
-        <Route path="/owner/dashboard" element={<PT><OwnerDashboard /></PT>} />
-        <Route path="/admin/dashboard" element={<PT><AdminDashboard /></PT>} />
-
-      </Routes>
-    </AnimatePresence>
+function App() {
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <NotificationsProvider>
+            <CartProvider>
+              <AppRoutes />
+            </CartProvider>
+          </NotificationsProvider>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

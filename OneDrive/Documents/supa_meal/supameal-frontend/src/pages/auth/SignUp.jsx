@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, EyeOff, Eye, User, Phone, Utensils } from 'lucide-react';
-import { FaGoogle, FaApple } from 'react-icons/fa';
+import { FaGoogle } from 'react-icons/fa';
 import AuthLayout from '../../layouts/AuthLayout';
 import Button from '../../components/Button/Button';
 import { useAuth } from '../../context/AuthContext';
@@ -12,7 +12,7 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', password: '' });
-  const { signup, loginWithGoogle, loginWithApple } = useAuth();
+  const { signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSignUp = async (e) => {
@@ -111,10 +111,6 @@ const SignUp = () => {
 
       <button type="button" className="auth-social-btn" onClick={loginWithGoogle}>
         <FaGoogle /> Continue with Google
-      </button>
-      
-      <button type="button" className="auth-social-btn" onClick={loginWithApple}>
-        <FaApple /> Continue with Apple
       </button>
 
       <div className="auth-footer" style={{ justifyContent: 'center', gap: '0.5rem' }}>
