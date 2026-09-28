@@ -3,21 +3,52 @@ import { menusApi } from '../services/api';
 
 const CartContext = createContext(null);
 
+const CART_KEY = 'supameal_cart';
+const RESTAURANT_KEY = 'selectedRestaurantId';
+
 export const MENU_ITEMS = [];
 
+const readStoredCart = () => {
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
 export const CartProvider = ({ children }) => {
-  const [cart, setCart] = useState({});
+  const [cart, setCart] = useState(readStoredCart);
   const [menuItems, setMenuItems] = useState([]);
-  const [selectedRestaurantId, setSelectedRestaurantId] = useState(null);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState(
+    () => localStorage.getItem(RESTAURANT_KEY) || null,
+  );
   const [loadingMenu, setLoadingMenu] = useState(false);
+
+  // Persist cart across reloads — previously only the restaurant id survived
+  useEffect(() => {
+    try {
+      if (Object.keys(cart).length > 0) {
+        localStorage.setItem(CART_KEY, JSON.stringify(cart));
+      } else {
+        localStorage.removeItem(CART_KEY);
+      }
+    } catch {
+      // storage unavailable — cart stays in memory
+    }
+  }, [cart]);
 
   const loadMenu = useCallback(async (restaurantId) => {
     if (!restaurantId) return;
     setLoadingMenu(true);
     try {
-      const items = await menusApi.list(restaurantId);
+      const res = await menusApi.list(restaurantId);
+      const items = Array.isArray(res) ? res : res?.data || [];
       setMenuItems(items);
       setSelectedRestaurantId(restaurantId);
+      localStorage.setItem(RESTAURANT_KEY, restaurantId);
     } catch (err) {
       console.error('Failed to load menu:', err);
     } finally {
@@ -26,13 +57,14 @@ export const CartProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const savedRestaurant = localStorage.getItem('selectedRestaurantId');
+    const savedRestaurant = localStorage.getItem(RESTAURANT_KEY);
     if (savedRestaurant) loadMenu(savedRestaurant);
   }, [loadMenu]);
 
   const selectRestaurant = useCallback((restaurantId) => {
-    localStorage.setItem('selectedRestaurantId', restaurantId);
+    localStorage.setItem(RESTAURANT_KEY, restaurantId);
     setCart({});
+    setMenuItems([]);
     loadMenu(restaurantId);
   }, [loadMenu]);
 

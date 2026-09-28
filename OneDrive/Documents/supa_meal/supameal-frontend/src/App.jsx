@@ -26,7 +26,6 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import NotFound from './pages/NotFound';
 import ProfilePage from './pages/customer/ProfilePage';
 import ReservationsPage from './pages/customer/ReservationsPage';
-import TestPage from './pages/TestPage';
 
 const ROLE_HOME = {
   customer: '/customer/dashboard',
@@ -67,7 +66,6 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/auth/callback" element={<OAuthCallback />} />
-      <Route path="/test" element={<TestPage />} />
       <Route path="*" element={<NotFound />} />
 
       <Route

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { authApi } from '../../services/api';
 import Loader from '../../components/Loader/Loader';
 
 const DASHBOARD_ROUTES = {
@@ -16,9 +17,7 @@ export default function OAuthCallback() {
   const { persistAuth } = useAuth();
 
   useEffect(() => {
-    const accessToken = searchParams.get('accessToken');
-    const refreshToken = searchParams.get('refreshToken');
-    const userParam = searchParams.get('user');
+    const code = searchParams.get('code');
     const error = searchParams.get('error');
 
     if (error) {
@@ -26,18 +25,31 @@ export default function OAuthCallback() {
       return;
     }
 
-    if (accessToken && userParam) {
+    if (!code) {
+      navigate('/login?error=OAuth+failed', { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+
+    const exchange = async () => {
       try {
-        const user = JSON.parse(decodeURIComponent(userParam));
-        persistAuth(user, accessToken, refreshToken);
-        const roleKey = user.role === 'owner' ? 'restaurant_owner' : user.role;
+        // Exchange the one-time code for tokens — tokens never touch the URL
+        const res = await authApi.exchange(code);
+        if (cancelled) return;
+        persistAuth(res.user, res.accessToken, res.refreshToken);
+        const roleKey = res.user?.role === 'owner' ? 'restaurant_owner' : res.user?.role;
         navigate(DASHBOARD_ROUTES[roleKey] || DASHBOARD_ROUTES.customer, { replace: true });
       } catch {
-        navigate('/login?error=Invalid+OAuth+response', { replace: true });
+        if (cancelled) return;
+        navigate('/login?error=Invalid+or+expired+OAuth+code', { replace: true });
       }
-    } else {
-      navigate('/login?error=OAuth+failed', { replace: true });
-    }
+    };
+    exchange();
+
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams, navigate, persistAuth]);
 
   return <Loader text="Completing sign-in..." />;

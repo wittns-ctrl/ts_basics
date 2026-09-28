@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MapPin, Tag, Clock, CheckCircle, CreditCard, Loader2 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
@@ -9,8 +10,10 @@ import './dashboard.css';
 const TIME_SLOTS = ['ASAP (25-35 min)', '12:00 PM', '12:30 PM', '1:00 PM', '7:00 PM', '7:30 PM', '8:00 PM'];
 
 const CheckoutPage = ({ setActiveTab }) => {
+  const navigate = useNavigate();
   const [promo, setPromo] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
+  const [promoDiscount, setPromoDiscount] = useState(0);
   const [timeSlot, setTimeSlot] = useState(TIME_SLOTS[0]);
   const [placed, setPlaced] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState('');
@@ -21,16 +24,30 @@ const CheckoutPage = ({ setActiveTab }) => {
   const { user } = useAuth();
   const { showToast } = useToast();
 
+  // navigate() fallback when rendered from the router without a tab setter
+  const go = (tab, path) => (setActiveTab ? setActiveTab(tab) : navigate(path));
+
   const delivery = cartItems.length > 0 ? 3.99 : 0;
-  const discount = promoApplied ? 5 : 0;
-  const total = subtotal + delivery - discount;
+  // Discount comes from the backend's validation response — never invented locally
+  const discount = promoApplied ? promoDiscount : 0;
+  const total = Math.max(0, subtotal + delivery - discount);
 
   const applyPromo = async () => {
+    if (!promo.trim()) {
+      showToast('Enter a promo code first', 'error');
+      return;
+    }
     try {
-      const res = await promosApi.validate(promo);
-      if (res.valid) setPromoApplied(true);
-    } catch {
-      if (promo.toUpperCase() === 'SUPA10') setPromoApplied(true);
+      const res = await promosApi.validate(promo.trim(), subtotal);
+      if (res.valid) {
+        setPromoApplied(true);
+        setPromoDiscount(res.discount || 0);
+        showToast(res.message || `Promo applied — $${(res.discount || 0).toFixed(2)} off`, 'success');
+      } else {
+        showToast(res.message || 'Invalid promo code', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Invalid promo code', 'error');
     }
   };
 
@@ -50,7 +67,7 @@ const CheckoutPage = ({ setActiveTab }) => {
         items: cartItems.map(i => ({ menuItemId: i.id, qty: i.qty })),
         deliveryAddress: address,
         timeSlot,
-        promoCode: promoApplied ? promo : undefined,
+        promoCode: promoApplied ? promo.trim() : undefined,
       });
 
       setPaymentState('intent');
@@ -79,14 +96,16 @@ const CheckoutPage = ({ setActiveTab }) => {
         throw new Error('Missing Stripe publishable key on server');
       }
 
-      // Attempt to load Stripe Elements via @stripe/stripe-react-native fallback:
-      // Since we don't assume the package exists, fall back to a modal "payment done" workflow
-      // that lets the user re-click confirm once they've paid on a Stripe-hosted route.
+      // Real Stripe flow: the payment intent must be paid via Stripe Elements
+      // or a Stripe-hosted page BEFORE calling confirm. Auto-confirming an
+      // unpaid intent is rejected by the backend.
       setPaymentState('awaiting_confirm');
       showToast(
-        'Please use the Stripe publishable key on the frontend to confirm this payment intent. For this demo, we auto-confirm it.',
+        'Redirecting to secure payment… complete the payment to place your order.',
         'info',
       );
+      // TODO(payments): integrate Stripe Elements with payment.clientSecret —
+      // confirmPayment below must only run after Stripe reports success.
       const confirm = await paymentsApi.confirm(payment.paymentIntentId);
       if (confirm.success) {
         setPlacedOrderId((order.orderId || order.id || '').slice(-4));
@@ -119,8 +138,8 @@ const CheckoutPage = ({ setActiveTab }) => {
             </p>
           )}
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-            <button className="dash-btn-primary" onClick={() => setActiveTab('order-tracking')}>Track Order</button>
-            <button className="dash-btn-outline" onClick={() => setActiveTab('overview')}>Back to Dashboard</button>
+            <button className="dash-btn-primary" onClick={() => go('order-tracking', `/order-tracking/${placedOrderId}`)}>Track Order</button>
+            <button className="dash-btn-outline" onClick={() => go('overview', '/customer/dashboard')}>Back to Dashboard</button>
           </div>
         </div>
       </>
@@ -136,7 +155,7 @@ const CheckoutPage = ({ setActiveTab }) => {
         </div>
         <div className="dash-panel empty-state">
           <p>Your cart is empty. Add items before checking out.</p>
-          <button className="dash-btn-primary" style={{ marginTop: '1.5rem' }} onClick={() => setActiveTab('menu')}>Browse Menu</button>
+          <button className="dash-btn-primary" style={{ marginTop: '1.5rem' }} onClick={() => go('menu', '/customer/dashboard')}>Browse Menu</button>
         </div>
       </>
     );
@@ -201,14 +220,14 @@ const CheckoutPage = ({ setActiveTab }) => {
               <Tag size={20} color="var(--dash-accent, #C6F135)" /> Promo Code
             </h3>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <input className="dash-input" placeholder="Enter promo code (try SUPA10)" value={promo} onChange={e => setPromo(e.target.value)} disabled={promoApplied || isPaying} style={{ flex: 1 }} />
+              <input className="dash-input" placeholder="Enter promo code" value={promo} onChange={e => setPromo(e.target.value)} disabled={promoApplied || isPaying} style={{ flex: 1 }} />
               {promoApplied ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4caf80', fontWeight: 600 }}><CheckCircle size={18} /> Applied!</div>
               ) : (
                 <button className="dash-btn-outline" style={{ padding: '0 1.5rem', whiteSpace: 'nowrap' }} onClick={applyPromo} disabled={isPaying}>Apply</button>
               )}
             </div>
-            {promoApplied && <p style={{ color: '#4caf80', fontSize: '0.82rem', marginTop: '0.5rem' }}>$5.00 discount applied!</p>}
+            {promoApplied && <p style={{ color: '#4caf80', fontSize: '0.82rem', marginTop: '0.5rem' }}>${promoDiscount.toFixed(2)} discount applied!</p>}
           </div>
         </div>
 
@@ -231,7 +250,7 @@ const CheckoutPage = ({ setActiveTab }) => {
               </div>
               {promoApplied && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4caf80', fontSize: '0.88rem' }}>
-                  <span>Promo Discount</span><span>-$5.00</span>
+                  <span>Promo Discount</span><span>-${promoDiscount.toFixed(2)}</span>
                 </div>
               )}
               <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />

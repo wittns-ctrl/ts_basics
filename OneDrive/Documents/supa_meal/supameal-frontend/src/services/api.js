@@ -10,14 +10,17 @@ export const authApi = {
   forgot: (data) => apiRequest('/auth/forgot', { method: 'POST', body: JSON.stringify(data) }),
   reset: (data) => apiRequest('/auth/reset', { method: 'POST', body: JSON.stringify(data) }),
   logout: (data) => apiRequest('/auth/logout', { method: 'POST', body: JSON.stringify(data) }),
+  // One-time code exchange for OAuth login (tokens are never in the URL)
+  exchange: (code) => apiRequest('/auth/oauth/exchange', { method: 'POST', body: JSON.stringify({ code }), skipAuth: true }),
 };
 
 
 // Restaurants
 export const restaurantsApi = {
-  list: (params = {}) => {
+  list: async (params = {}) => {
     const q = new URLSearchParams(params).toString();
-    return apiRequest(`/restaurants${q ? `?${q}` : ''}`);
+    const res = await apiRequest(`/restaurants${q ? `?${q}` : ''}`);
+    return Array.isArray(res) ? res : res?.data || [];
   },
   get: (id) => apiRequest(`/restaurants/${id}`),
   register: (data) => apiRequest('/restaurants/register', { method: 'POST', body: JSON.stringify(data) }),
@@ -43,9 +46,10 @@ export const menusApi = {
 // Orders
 export const ordersApi = {
   create: (data) => apiRequest('/orders', { method: 'POST', body: JSON.stringify(data) }),
-  list: (params = {}) => {
+  list: async (params = {}) => {
     const q = new URLSearchParams(params).toString();
-    return apiRequest(`/orders${q ? `?${q}` : ''}`);
+    const res = await apiRequest(`/orders${q ? `?${q}` : ''}`);
+    return Array.isArray(res) ? res : res?.data || [];
   },
   get: (id) => apiRequest(`/orders/${id}`),
   tracking: (id) => apiRequest(`/orders/${id}/tracking`),
@@ -56,9 +60,10 @@ export const ordersApi = {
 // Bookings
 export const bookingsApi = {
   create: (data) => apiRequest('/bookings', { method: 'POST', body: JSON.stringify(data) }),
-  list: (params = {}) => {
+  list: async (params = {}) => {
     const q = new URLSearchParams(params).toString();
-    return apiRequest(`/bookings${q ? `?${q}` : ''}`);
+    const res = await apiRequest(`/bookings${q ? `?${q}` : ''}`);
+    return Array.isArray(res) ? res : res?.data || [];
   },
   update: (id, data) => apiRequest(`/bookings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   cancel: (id) => apiRequest(`/bookings/${id}`, { method: 'DELETE' }),
@@ -70,9 +75,10 @@ export const usersApi = {
   getDashboardStats: (id) => apiRequest(`/users/${id}/dashboard-stats`),
   update: (id, data) => apiRequest(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   changePassword: (id, data) => apiRequest(`/users/${id}/password`, { method: 'PATCH', body: JSON.stringify(data) }),
-  list: (params = {}) => {
+  list: async (params = {}) => {
     const q = new URLSearchParams(params).toString();
-    return apiRequest(`/users${q ? `?${q}` : ''}`);
+    const res = await apiRequest(`/users${q ? `?${q}` : ''}`);
+    return Array.isArray(res) ? res : res?.data || [];
   },
   setStatus: (id, status) => apiRequest(`/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   favorites: (id) => apiRequest(`/users/${id}/favorites`),
@@ -88,7 +94,10 @@ export const reviewsApi = {
 
 // Notifications
 export const notificationsApi = {
-  list: (userId) => apiRequest(`/notifications${userId ? `?userId=${userId}` : ''}`),
+  list: async (userId) => {
+    const res = await apiRequest(`/notifications${userId ? `?userId=${userId}` : ''}`);
+    return Array.isArray(res) ? res : res?.data || [];
+  },
   markRead: (id) => apiRequest(`/notifications/${id}/read`, { method: 'PATCH' }),
   markAllRead: () => apiRequest('/notifications/read-all', { method: 'PATCH' }),
   dismiss: (id) => apiRequest(`/notifications/${id}`, { method: 'DELETE' }),
@@ -105,7 +114,11 @@ export const adminApi = {
 
 // Promos & Mail
 export const promosApi = {
-  validate: (code) => apiRequest('/promos/validate', { method: 'POST', body: JSON.stringify({ code }) }),
+  validate: (code, subtotal) =>
+    apiRequest('/promos/validate', {
+      method: 'POST',
+      body: JSON.stringify({ code, subtotal: Number(subtotal) || 0 }),
+    }),
 };
 
 // Payments
@@ -126,9 +139,6 @@ export const mailApi = {
   contact: (data) => apiRequest('/mail/contact', { method: 'POST', body: JSON.stringify(data) }),
 };
 
-// Demo credentials mapped to roles (seeded in backend)
-export const DEMO_CREDENTIALS = {
-  customer: { email: 'alex@supameal.com', password: 'Password123!' },
-  restaurant_owner: { email: 'maria@goldenplate.com', password: 'Password123!' },
-  admin: { email: 'admin@supameal.com', password: 'Password123!' },
-};
+// NOTE: pagination — list endpoints now return { data, pagination }.
+// Use the helpers below to read them defensively.
+export const unwrapList = (res) => (Array.isArray(res) ? res : res?.data || []);

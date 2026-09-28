@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { authApi } from '../services/api';
+import { setTokenRefreshListener } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -24,6 +25,14 @@ export const AuthProvider = ({ children }) => {
     if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
   }, []);
 
+  const forceLogout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    clearRefreshTimer();
+  }, []);
+
   const refreshToken = useCallback(async () => {
     const stored = localStorage.getItem('refreshToken');
     if (!stored) return false;
@@ -32,14 +41,21 @@ export const AuthProvider = ({ children }) => {
       persistAuth(res.user, res.accessToken, res.refreshToken);
       return true;
     } catch (err) {
-      setUser(null);
-      localStorage.removeItem('user');
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      clearRefreshTimer();
+      forceLogout();
       return false;
     }
-  }, [persistAuth]);
+  }, [persistAuth, forceLogout]);
+
+  // The api client auto-refreshes on 401 — persist rotated tokens here too
+  useEffect(() => {
+    setTokenRefreshListener((data) => {
+      if (data.user) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+    });
+    return () => setTokenRefreshListener(null);
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -51,9 +67,7 @@ export const AuthProvider = ({ children }) => {
         try {
           setUser(JSON.parse(stored));
         } catch {
-          localStorage.removeItem('user');
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
+          forceLogout();
         }
       } else if (refresh) {
         await refreshToken();
@@ -61,7 +75,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     };
     init();
-  }, [refreshToken]);
+  }, [refreshToken, forceLogout]);
 
   useEffect(() => {
     clearRefreshTimer();
@@ -77,19 +91,12 @@ export const AuthProvider = ({ children }) => {
     return res.user;
   }, [persistAuth]);
 
-  const enterAs = useCallback(async (role) => {
-    const { DEMO_CREDENTIALS } = await import('../services/api');
-    const creds = DEMO_CREDENTIALS[role];
-    if (!creds) return null;
-    return loginWithCredentials(creds.email, creds.password);
-  }, [loginWithCredentials]);
-
-  const login = useCallback(async (email, password, role = 'customer') => {
-    if (email && password) {
-      return loginWithCredentials(email, password);
+  const login = useCallback(async (email, password) => {
+    if (!email || !password) {
+      throw new Error('Email and password are required');
     }
-    return enterAs(role);
-  }, [loginWithCredentials, enterAs]);
+    return loginWithCredentials(email, password);
+  }, [loginWithCredentials]);
 
   const signup = useCallback(async (data) => {
     return authApi.signup(data);
@@ -134,12 +141,8 @@ export const AuthProvider = ({ children }) => {
     } catch {
       // ignore logout API errors
     }
-    clearRefreshTimer();
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-  }, [user]);
+    forceLogout();
+  }, [user, forceLogout]);
 
   const updateUser = useCallback((updatedUserData) => {
     setUser((prev) => {
@@ -159,7 +162,6 @@ export const AuthProvider = ({ children }) => {
       loginWithApple,
       persistAuth,
       logout,
-      enterAs,
       signup,
       verifyOtp,
       resendOtp,
@@ -168,7 +170,6 @@ export const AuthProvider = ({ children }) => {
       refreshToken,
       loading,
       isAuthenticated: !!user,
-      isDemoMode: false,
     }}>
       {children}
     </AuthContext.Provider>
