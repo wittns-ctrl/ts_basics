@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { ordersApi, promosApi, paymentsApi } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import StripeCheckout from '../../components/StripeCheckout';
 import './dashboard.css';
 
 const TIME_SLOTS = ['ASAP (25-35 min)', '12:00 PM', '12:30 PM', '1:00 PM', '7:00 PM', '7:30 PM', '8:00 PM'];
@@ -20,6 +21,8 @@ const CheckoutPage = ({ setActiveTab }) => {
   const [address, setAddress] = useState({ street: '', apartment: '', city: '', postalCode: '', instructions: '' });
   const [paymentState, setPaymentState] = useState('idle');
   const [paymentWarning, setPaymentWarning] = useState('');
+  // Stripe intent awaiting user payment: { paymentIntentId, clientSecret, publishableKey }
+  const [pendingPayment, setPendingPayment] = useState(null);
   const { cartItems, subtotal, clearCart, selectedRestaurantId } = useCart();
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -95,32 +98,60 @@ const CheckoutPage = ({ setActiveTab }) => {
       if (!stripeKey) {
         throw new Error('Missing Stripe publishable key on server');
       }
-
-      // Real Stripe flow: the payment intent must be paid via Stripe Elements
-      // or a Stripe-hosted page BEFORE calling confirm. Auto-confirming an
-      // unpaid intent is rejected by the backend.
-      setPaymentState('awaiting_confirm');
-      showToast(
-        'Redirecting to secure payment… complete the payment to place your order.',
-        'info',
-      );
-      // TODO(payments): integrate Stripe Elements with payment.clientSecret —
-      // confirmPayment below must only run after Stripe reports success.
-      const confirm = await paymentsApi.confirm(payment.paymentIntentId);
-      if (confirm.success) {
-        setPlacedOrderId((order.orderId || order.id || '').slice(-4));
-        setPlaced(true);
-        setPaymentState('paid');
-        clearCart();
-        showToast('Order placed successfully!', 'success');
-      } else {
-        throw new Error('Payment not completed');
+      if (!payment.clientSecret) {
+        throw new Error('Missing payment client secret from server');
       }
+
+      // Real Stripe flow: mount Stripe Elements and let the user pay the
+      // intent first. Our backend confirm only runs after Stripe reports the
+      // intent as succeeded (webhooks also keep the server in sync).
+      setPendingPayment({
+        paymentIntentId: payment.paymentIntentId,
+        clientSecret: payment.clientSecret,
+        publishableKey: stripeKey,
+      });
+      setPaymentState('awaiting_confirm');
     } catch (err) {
       console.error(err);
       setPaymentState('idle');
       showToast(err.message || 'Failed to place order', 'error');
     }
+  };
+
+  // Runs ONLY after Stripe Elements reports the intent as succeeded
+  const handleStripeSuccess = async (stripePaymentIntentId) => {
+    const intentId = stripePaymentIntentId || pendingPayment?.paymentIntentId;
+    if (!intentId) {
+      showToast('Payment succeeded but no payment reference was returned', 'error');
+      return;
+    }
+    try {
+      setPaymentState('confirming');
+      const confirm = await paymentsApi.confirm(intentId);
+      if (!confirm.success) throw new Error('Payment not completed');
+      setPlacedOrderId(String(intentId).slice(-4));
+      setPlaced(true);
+      setPaymentState('paid');
+      setPendingPayment(null);
+      clearCart();
+      showToast('Order placed successfully!', 'success');
+    } catch (err) {
+      console.error(err);
+      setPaymentState('idle');
+      setPendingPayment(null);
+      showToast(err.message || 'Could not finalize your order after payment', 'error');
+    }
+  };
+
+  const handleStripeError = (message) => {
+    // Keep the order + intent alive so the user can retry with another card —
+    // the backend reuses the same pending intent on the next attempt.
+    showToast(message || 'Payment failed. Please try again.', 'error');
+  };
+
+  const handleCancelPayment = () => {
+    setPendingPayment(null);
+    setPaymentState('idle');
   };
 
   if (placed) {
@@ -141,6 +172,33 @@ const CheckoutPage = ({ setActiveTab }) => {
             <button className="dash-btn-primary" onClick={() => go('order-tracking', `/order-tracking/${placedOrderId}`)}>Track Order</button>
             <button className="dash-btn-outline" onClick={() => go('overview', '/customer/dashboard')}>Back to Dashboard</button>
           </div>
+        </div>
+      </>
+    );
+  }
+
+  // Stripe Elements panel — shown while the user completes the payment
+  if (pendingPayment && paymentState === 'awaiting_confirm') {
+    return (
+      <>
+        <div className="page-header">
+          <h1>Complete Payment</h1>
+          <p>Your order is reserved — finish the payment to confirm it.</p>
+        </div>
+        <div className="dash-panel" style={{ maxWidth: 520, margin: '0 auto' }}>
+          <StripeCheckout
+            publishableKey={pendingPayment.publishableKey}
+            clientSecret={pendingPayment.clientSecret}
+            onSuccess={handleStripeSuccess}
+            onError={handleStripeError}
+          />
+          <button
+            className="dash-btn-outline"
+            style={{ width: '100%', marginTop: '0.75rem' }}
+            onClick={handleCancelPayment}
+          >
+            Cancel and review order
+          </button>
         </div>
       </>
     );
