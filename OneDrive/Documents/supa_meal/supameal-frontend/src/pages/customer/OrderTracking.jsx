@@ -1,34 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { CheckCircle, Clock, MapPin, Package, Truck, Home } from 'lucide-react';
-import { ordersApi } from '../../services/api';
+import { useParams, useNavigate } from 'react-router-dom';
+import { CheckCircle, MapPin, Truck, Radio } from 'lucide-react';
+import { useLiveOrderTracking } from '../../hooks/useLiveOrderTracking';
 import './dashboard.css';
 import './OrderTracking.css';
 
-const ICON_MAP = { placed: Package, confirmed: CheckCircle, preparing: Clock, 'on-way': Truck, delivered: Home };
+const OrderTracking = ({ orderId: orderIdProp, setActiveTab }) => {
+  const params = useParams();
+  const navigate = useNavigate();
+  // Route mode (App.jsx passes no props) or embedded mode (prop)
+  const orderId = orderIdProp || params.orderId;
+  const go = (tab, path) => (setActiveTab ? setActiveTab(tab) : navigate(path));
 
-const OrderTracking = ({ orderId, setActiveTab }) => {
-  const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const load = async () => {
-      if (!orderId) return;
-      try {
-        const data = await ordersApi.tracking(orderId);
-        setOrder(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-    const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
-  }, [orderId]);
+  const { order, loading, loadFailed, live } = useLiveOrderTracking(orderId);
 
   if (loading) return <div className="page-header"><p>Loading order tracking...</p></div>;
-  if (!order) return <div className="page-header"><p>Order not found</p></div>;
+  if (!order) {
+    return (
+      <div className="page-header">
+        <p>{loadFailed ? 'Could not load this order — check your connection and try again.' : 'Order not found'}</p>
+        {loadFailed && (
+          <button className="dash-btn-outline" style={{ marginTop: '1rem' }} onClick={() => window.location.reload()}>
+            Retry
+          </button>
+        )}
+      </div>
+    );
+  }
 
   const steps = order.timeline?.length ? order.timeline : [
     { key: 'placed', label: 'Order Placed', done: true, time: '—' },
@@ -43,7 +40,27 @@ const OrderTracking = ({ orderId, setActiveTab }) => {
     <>
       <div className="page-header">
         <h1>Order Tracking</h1>
-        <p>Live status timeline, ETA, and delivery updates for order #{order.orderId || orderId?.slice(-4)}.</p>
+        <p>
+          Live status timeline, ETA, and delivery updates for order #{order.orderId || orderId?.slice(-4)}.
+        </p>
+        <span
+          title={live ? 'Connected — updates arrive instantly' : 'Reconnecting — polling every 15s'}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            color: live ? '#4caf80' : 'var(--dash-muted, #8a8a8a)',
+            border: `1px solid ${live ? 'rgba(76,175,128,0.4)' : 'rgba(255,255,255,0.12)'}`,
+            borderRadius: 999,
+            padding: '0.15rem 0.7rem',
+            marginTop: '0.5rem',
+          }}
+        >
+          <Radio size={13} className={live ? 'animate-spin' : ''} />
+          {live ? 'LIVE' : 'RECONNECTING…'}
+        </span>
       </div>
 
       <div className="dash-grid-sidebar">
@@ -55,7 +72,6 @@ const OrderTracking = ({ orderId, setActiveTab }) => {
 
           <div className="tracking-timeline">
             {steps.map((step, i) => {
-              const Icon = ICON_MAP[step.key] || Package;
               const isActive = i === activeIndex + 1 || (activeIndex === -1 && i === steps.length - 1 && step.done);
               return (
                 <div key={step.key} className={`tracking-step ${step.done ? 'done' : ''} ${isActive ? 'active' : ''}`}>
@@ -103,7 +119,7 @@ const OrderTracking = ({ orderId, setActiveTab }) => {
             )}
           </div>
 
-          <button className="dash-btn-outline" onClick={() => setActiveTab('orders')}>Back to Orders</button>
+          <button className="dash-btn-outline" onClick={() => go('orders', '/customer/dashboard')}>Back to Orders</button>
         </div>
       </div>
     </>

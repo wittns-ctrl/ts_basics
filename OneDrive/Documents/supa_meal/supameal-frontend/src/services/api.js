@@ -1,4 +1,7 @@
-import { apiRequest } from '../api/client';
+import { apiRequest, API_URL, ApiError } from '../api/client';
+
+// Re-exported for consumers that build absolute URLs (SSE stream, image srcs)
+export { API_URL, ApiError };
 
 // Auth
 export const authApi = {
@@ -27,9 +30,9 @@ export const restaurantsApi = {
   update: (id, data) => apiRequest(`/restaurants/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   byOwner: (ownerId) => apiRequest(`/restaurants/owner/${ownerId}`),
   approve: (id, approved) => apiRequest(`/restaurants/${id}/approve`, { method: 'PATCH', body: JSON.stringify({ approved }) }),
-  setStatus: (id, status) => apiRequest(`/restaurants/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   addImages: (id, images) => apiRequest(`/restaurants/${id}/images`, { method: 'POST', body: JSON.stringify({ images }) }),
   removeImage: (id, imageUrl) => apiRequest(`/restaurants/${id}/images`, { method: 'DELETE', body: JSON.stringify({ imageUrl }) }),
+  setStatus: (id, status) => apiRequest(`/restaurants/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   analyticsOverview: (id) => apiRequest(`/restaurants/${id}/analytics/overview`),
   analyticsRevenue: (id, period) => apiRequest(`/restaurants/${id}/analytics/revenue?period=${period || 'week'}`),
   analyticsPeakHours: (id) => apiRequest(`/restaurants/${id}/analytics/peak-hours`),
@@ -43,6 +46,33 @@ export const menusApi = {
   delete: (id) => apiRequest(`/menus/${id}`, { method: 'DELETE' }),
 };
 
+// Image uploads — multipart needs its own fetch (no JSON content-type; the
+// browser sets the multipart boundary). JWT is attached manually.
+export const uploadsApi = {
+  upload: async (file) => {
+    const token = localStorage.getItem('accessToken');
+    const body = new FormData();
+    body.append('file', file);
+    const res = await fetch(`${API_URL}/uploads`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(data.message || 'Upload failed', res.status);
+    return data; // { url, size }
+  },
+};
+
+// Resolve a stored image reference to a browser-usable URL.
+// '/uploads/x.jpg' → API origin; http(s) passes through; '' → null.
+export function resolveImageUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('/uploads/')) return `${API_URL}${url}`;
+  if (url.startsWith('http')) return url;
+  return null;
+}
+
 // Orders
 export const ordersApi = {
   create: (data) => apiRequest('/orders', { method: 'POST', body: JSON.stringify(data) }),
@@ -53,6 +83,9 @@ export const ordersApi = {
   },
   get: (id) => apiRequest(`/orders/${id}`),
   tracking: (id) => apiRequest(`/orders/${id}/tracking`),
+  // One-time short-lived ticket for the SSE live-tracking stream (EventSource
+  // can't send an Authorization header, so we trade the JWT for a ticket)
+  streamTicket: (id) => apiRequest(`/orders/${id}/ticket`, { method: 'POST' }),
   updateStatus: (id, status) => apiRequest(`/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   reorder: (id) => apiRequest(`/orders/${id}/reorder`, { method: 'POST' }),
 };
