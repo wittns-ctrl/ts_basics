@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MapPin, Filter, Star, ArrowLeft } from 'lucide-react';
+import { Search, Filter, ArrowLeft } from 'lucide-react';
 import Navbar from '../../sections/Navbar/Navbar';
 import Footer from '../../sections/Footer/Footer';
 import Button from '../../components/Button/Button';
 import Dropdown from '../../components/Input/Dropdown';
 import RestaurantCard from '../../components/RestaurantCard/RestaurantCard';
-import { restaurantsApi } from '../../services/api';
+import { restaurantsApi, resolveImageUrl } from '../../services/api';
 import './Restaurants.css';
 
 import img1 from '../../assets/images/restaurant_interior.png';
@@ -30,7 +30,7 @@ const Restaurants = () => {
       });
       setRestaurants(data.map(r => ({
         ...r,
-        image: r.image?.startsWith('http') ? r.image : img1,
+        image: resolveImageUrl(r.image) || img1,
       })));
     } catch (err) {
       console.error('Failed to load restaurants:', err);

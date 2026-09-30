@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Star, MapPin, Clock, Users, Phone, Navigation } from 'lucide-react';
 import Navbar from '../../sections/Navbar/Navbar';
 import Footer from '../../sections/Footer/Footer';
 import Button from '../../components/Button/Button';
-import { restaurantsApi, reviewsApi } from '../../services/api';
+import { restaurantsApi, reviewsApi, resolveImageUrl } from '../../services/api';
 import { useCart } from '../../context/CartContext';
 import img1 from '../../assets/images/restaurant_interior.png';
 import './RestaurantDetails.css';
@@ -24,7 +24,7 @@ const RestaurantDetails = () => {
         const data = await restaurantsApi.get(id);
         setRestaurant({
           ...data,
-          image: data.image?.startsWith('http') ? data.image : img1,
+          image: resolveImageUrl(data.image) || img1,
         });
         const rev = await reviewsApi.list(id);
         setReviews(rev);

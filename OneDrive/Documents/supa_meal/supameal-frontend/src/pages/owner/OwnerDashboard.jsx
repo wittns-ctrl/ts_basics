@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { restaurantsApi, bookingsApi, ordersApi, menusApi } from '../../services/api';
+import { restaurantsApi, bookingsApi, ordersApi, menusApi, uploadsApi, resolveImageUrl } from '../../services/api';
 import DashboardLayout from '../../layouts/DashboardLayout/DashboardLayout';
 import {
-  BarChart2, ShoppingBag, BookOpen, Utensils, Camera, Plus, Trash2,
-  Edit3, Check, X, Clock, Settings, Image as ImageIcon, TrendingUp,
+  BarChart2, ShoppingBag, BookOpen, Camera, Plus, Trash2,
+  Edit3, Check, X, Clock, Settings, TrendingUp,
   CheckCircle, AlertCircle, Star, DollarSign
 } from 'lucide-react';
 import '../customer/dashboard.css';
@@ -12,7 +12,7 @@ import img1 from '../../assets/images/restaurant_interior.png';
 import promoPasta from '../../assets/images/promo_pasta.png';
 
 // ── Sidebar Config ─────────────────────────────────────────────────────────
-export const ownerSidebarConfig = [
+const ownerSidebarConfig = [
   { id: 'overview', label: 'Dashboard Overview', icon: BarChart2 },
   {
     id: 'restaurant-group',
@@ -61,27 +61,7 @@ const BarChartSVG = ({ data, color = '#d78a26' }) => {
       })}
     </svg>
   );
-};
-
-const SparkLine = ({ data, color = '#4caf80' }) => {
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const w = 300, h = 70;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / (max - min || 1)) * (h - 10);
-    return `${x},${y}`;
-  }).join(' ');
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 70 }}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5"
-        strokeLinecap="round" strokeLinejoin="round" />
-      <polyline points={`0,${h} ${pts} ${w},${h}`} fill={`${color}18`} stroke="none" />
-    </svg>
-  );
-};
-
-// ── Toast ──────────────────────────────────────────────────────────────────
+};// ── Toast ──────────────────────────────────────────────────────────────────
 const Toast = ({ message, type = 'success', onClose }) => (
   <div style={{
     position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 9999,
@@ -110,13 +90,38 @@ const MenuDialog = ({ item, onSave, onClose }) => {
     available: item?.available ?? true,
     spicy: item?.spicy ?? false,
     veg: item?.veg ?? false,
+    image: item?.rawImage || item?.image || '',
   });
+  const [uploading, setUploading] = useState(false);
+  const photoRef = useRef(null);
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be under 5 MB');
+      return;
+    }
+    setUploading(true);
+    try {
+      const { url } = await uploadsApi.upload(file);
+      setForm(p => ({ ...p, image: url }));
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.name || !form.price) return;
     onSave({ ...form, price: parseFloat(form.price) });
   };
+
+  const photoPreview = resolveImageUrl(form.image);
 
   return (
     <div style={{
@@ -137,6 +142,34 @@ const MenuDialog = ({ item, onSave, onClose }) => {
 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="dash-form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Photo</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  width: 72, height: 72, borderRadius: 12, background: '#1a1a1a',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  overflow: 'hidden', flexShrink: 0, fontSize: '1.6rem',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  {photoPreview
+                    ? <img src={photoPreview} alt="Item preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : (form.image || '🍽️')}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <button type="button" className="dash-btn-outline" style={{ padding: '0.4rem 1rem', fontSize: '0.82rem' }}
+                    disabled={uploading} onClick={() => photoRef.current?.click()}>
+                    {uploading ? 'Uploading…' : 'Upload photo'}
+                  </button>
+                  {form.image && form.image.startsWith('/uploads/') && (
+                    <button type="button" style={{ background: 'none', border: 'none', color: '#e05555', cursor: 'pointer', fontSize: '0.78rem', textAlign: 'left', padding: 0 }}
+                      onClick={() => setForm(p => ({ ...p, image: '' }))}>
+                      Remove photo
+                    </button>
+                  )}
+                </div>
+                <input ref={photoRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} style={{ display: 'none' }} />
+              </div>
+            </div>
             <div className="dash-form-group" style={{ gridColumn: '1 / -1' }}>
               <label>Item Name *</label>
               <input className="dash-input" placeholder="e.g. Truffle Burger"
@@ -360,35 +393,88 @@ const RestaurantProfile = ({ showToast }) => (
 );
 
 // ── Gallery ────────────────────────────────────────────────────────────────
-const Gallery = ({ showToast }) => {
-  const photos = [img1, promoPasta, img1, promoPasta, promoPasta, img1];
+const Gallery = ({ showToast, restaurantId }) => {
+  const [photos, setPhotos] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    if (!restaurantId) return;
+    restaurantsApi.get(restaurantId)
+      .then(r => setPhotos(r.images || []))
+      .catch(console.error);
+  }, [restaurantId]);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image must be under 5 MB', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { url } = await uploadsApi.upload(file);
+      const updated = await restaurantsApi.addImages(restaurantId, [url]);
+      setPhotos(updated.images || []);
+      showToast('Photo uploaded!');
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Upload failed', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemove = async (url) => {
+    try {
+      const updated = await restaurantsApi.removeImage(restaurantId, url);
+      setPhotos(updated.images || []);
+      showToast('Photo removed.', 'error');
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Could not remove photo', 'error');
+    }
+  };
+
   return (
     <>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div><h1>Gallery</h1><p>Manage your restaurant's photo gallery.</p></div>
-        <button className="dash-btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={() => showToast('Photo upload would open here.', 'info')}>
-          <Plus size={16} /> Upload Photo
+        <button className="dash-btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }} disabled={busy} onClick={() => fileRef.current?.click()}>
+          <Plus size={16} /> {busy ? 'Uploading…' : 'Upload Photo'}
         </button>
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
       </div>
       <div className="dash-panel">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-          {photos.map((photo, i) => (
-            <div key={i} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', aspectRatio: '4/3' }}>
-              <img src={photo} alt={`Gallery ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              <div style={{
-                position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', transition: 'background 0.2s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.6)'; e.currentTarget.querySelectorAll('button').forEach(b => b.style.opacity = '1'); }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0)'; e.currentTarget.querySelectorAll('button').forEach(b => b.style.opacity = '0'); }}
-              >
-                <button onClick={() => showToast('Photo deleted.', 'error')} style={{ opacity: 0, background: '#e05555', border: 'none', color: '#fff', padding: '0.4rem', borderRadius: '8px', cursor: 'pointer', transition: 'opacity 0.2s', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem' }}>
-                  <Trash2 size={14} /> Remove
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        {photos.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>
+            No photos yet — upload your first one (JPEG, PNG, or WebP, up to 5 MB).
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+            {photos.map((photo, i) => {
+              const src = resolveImageUrl(photo);
+              return (
+                <div key={photo} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', aspectRatio: '4/3' }}>
+                  {src && <img src={src} alt={`Gallery ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  <div style={{
+                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', transition: 'background 0.2s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.6)'; e.currentTarget.querySelectorAll('button').forEach(b => b.style.opacity = '1'); }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0)'; e.currentTarget.querySelectorAll('button').forEach(b => b.style.opacity = '0'); }}
+                  >
+                    <button onClick={() => handleRemove(photo)} style={{ opacity: 0, background: '#e05555', border: 'none', color: '#fff', padding: '0.4rem', borderRadius: '8px', cursor: 'pointer', transition: 'opacity 0.2s', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem' }}>
+                      <Trash2 size={14} /> Remove
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </>
   );
@@ -404,7 +490,9 @@ const MenuManagement = ({ showToast, restaurantId }) => {
       setItems(data.map(m => ({
         id: m.id, name: m.name, category: m.category, price: m.price,
         available: m.available, spicy: m.spicy, veg: m.veg,
-        description: m.description, img: promoPasta,
+        description: m.description,
+        img: resolveImageUrl(m.image) || promoPasta,
+        rawImage: m.image,
       })));
     }).catch(console.error);
   }, [restaurantId]);
@@ -421,16 +509,26 @@ const MenuManagement = ({ showToast, restaurantId }) => {
       const created = await menusApi.create({
         restaurant: restaurantId, name: form.name, category: form.category,
         price: form.price, description: form.description || '',
-        isAvailable: form.available, spicy: form.spicy, veg: form.veg, image: '🍽️',
+        isAvailable: form.available, spicy: form.spicy, veg: form.veg,
+        image: form.image || '🍽️',
       });
-      setItems(prev => [...prev, { ...form, id: created.id, img: promoPasta }]);
+      setItems(prev => [...prev, {
+        ...form, id: created.id,
+        img: resolveImageUrl(created.image) || promoPasta,
+        rawImage: created.image,
+      }]);
       showToast(`"${form.name}" added to menu!`);
     } else {
-      await menusApi.update(dialog.item.id, {
+      const updated = await menusApi.update(dialog.item.id, {
         name: form.name, category: form.category, price: form.price,
         description: form.description, isAvailable: form.available, spicy: form.spicy, veg: form.veg,
+        ...(form.image ? { image: form.image } : {}),
       });
-      setItems(prev => prev.map(i => i.id === dialog.item.id ? { ...i, ...form } : i));
+      setItems(prev => prev.map(i => i.id === dialog.item.id ? {
+        ...i, ...form,
+        img: resolveImageUrl(updated.image) || promoPasta,
+        rawImage: updated.image,
+      } : i));
       showToast(`"${form.name}" updated!`);
     }
     setDialog(null);
@@ -807,15 +905,25 @@ const OwnerDashboard = () => {
   };
 
   const handleAcceptBooking = async (id) => {
-    await bookingsApi.update(id, { status: 'confirmed' });
-    if (restaurantId) loadOwnerData(user?.id, restaurantId);
-    showToast('Booking confirmed!');
+    try {
+      await bookingsApi.update(id, { status: 'confirmed' });
+      if (restaurantId) loadOwnerData(user?.id, restaurantId);
+      showToast('Booking confirmed!');
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Could not confirm booking', 'error');
+    }
   };
 
   const handleRejectBooking = async (id) => {
-    await bookingsApi.update(id, { status: 'rejected', rejectionReason: 'Not available' });
-    if (restaurantId) loadOwnerData(user?.id, restaurantId);
-    showToast('Booking rejected.', 'error');
+    try {
+      await bookingsApi.update(id, { status: 'rejected', rejectionReason: 'Not available' });
+      if (restaurantId) loadOwnerData(user?.id, restaurantId);
+      showToast('Booking rejected.', 'error');
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Could not reject booking', 'error');
+    }
   };
 
   const handleMarkReady = async (id) => {
@@ -836,7 +944,7 @@ const OwnerDashboard = () => {
     switch (activeTab) {
       case 'overview': return <DashboardOverview setActiveTab={setActiveTab} orders={orders} bookings={bookings} />;
       case 'profile': return <RestaurantProfile showToast={showToast} />;
-      case 'gallery': return <Gallery showToast={showToast} />;
+      case 'gallery': return <Gallery showToast={showToast} restaurantId={restaurantId} />;
       case 'menu': return <MenuManagement showToast={showToast} restaurantId={restaurantId} />;
       case 'bookings': return <BookingManagement bookings={bookings} onAccept={handleAcceptBooking} onReject={handleRejectBooking} />;
       case 'orders': return <OrderManagement orders={orders} onMarkReady={handleMarkReady} onMarkDelivered={handleMarkDelivered} />;

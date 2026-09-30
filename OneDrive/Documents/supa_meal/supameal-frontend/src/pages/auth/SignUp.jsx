@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, EyeOff, Eye, User, Phone, Utensils } from 'lucide-react';
 import { FaGoogle } from 'react-icons/fa';
@@ -24,7 +24,7 @@ const SignUp = () => {
         name: `${form.firstName} ${form.lastName}`.trim(),
         email: form.email,
         password: form.password,
-        phone: Number(form.phone.replace(/\D/g, '')) || form.phone,
+        phone: form.phone.trim(),
         role: 'customer',
       });
       localStorage.setItem('pendingVerificationEmail', form.email);

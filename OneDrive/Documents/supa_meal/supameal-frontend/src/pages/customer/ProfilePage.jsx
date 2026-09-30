@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { User, Lock, Camera } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usersApi } from '../../services/api';
@@ -75,7 +75,7 @@ const ProfilePage = () => {
       const updated = await usersApi.update(user.id, {
         name: newName,
         email: profile.email,
-        phone: Number(String(profile.phone).replace(/\D/g, '')) || profile.phone,
+        phone: profile.phone.trim(),
         deliveryAddress: { street: profile.deliveryAddress },
         profile: nextProfile,
       });

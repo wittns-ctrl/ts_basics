@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Search, ShoppingCart, Star, Filter, Package } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { resolveImageUrl } from '../../services/api';
 import './dashboard.css';
 
 const CATEGORIES = ['All', 'Starters', 'Main Course', 'Burgers', 'Pasta', 'Sushi', 'Desserts', 'Drinks'];
@@ -8,7 +9,7 @@ const CATEGORIES = ['All', 'Starters', 'Main Course', 'Burgers', 'Pasta', 'Sushi
 const MenuPage = ({ setActiveTab }) => {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
-  const { cart, cartCount, addToCart, removeFromCart, menuItems, loadingMenu } = useCart();
+  const { cart, cartCount, addToCart, removeFromCart, menuItems } = useCart();
 
   const filtered = menuItems.filter(item =>
     (category === 'All' || item.category === category) &&
@@ -46,10 +47,16 @@ const MenuPage = ({ setActiveTab }) => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.25rem' }}>
-        {filtered.map(item => (
+        {filtered.map(item => {
+          const imgSrc = resolveImageUrl(item.image);
+          return (
           <div key={item.id} className="dash-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', marginBottom: 0 }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem', textAlign: 'center', background: '#1a1a1a', borderRadius: 12, padding: '1rem' }}>
-              <Package size={40} color="var(--dash-accent)" />
+            <div style={{ marginBottom: '0.75rem', textAlign: 'center', background: '#1a1a1a', borderRadius: 12, padding: '1rem' }}>
+              {imgSrc ? (
+                <img src={imgSrc} alt={item.name} loading="lazy" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 8 }} />
+              ) : (
+                <Package size={40} color="var(--dash-accent)" />
+              )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
               <span style={{ fontWeight: 600, color: 'var(--dash-text, #fff)', fontSize: '0.95rem' }}>{item.name}</span>
@@ -72,7 +79,8 @@ const MenuPage = ({ setActiveTab }) => {
               </button>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );

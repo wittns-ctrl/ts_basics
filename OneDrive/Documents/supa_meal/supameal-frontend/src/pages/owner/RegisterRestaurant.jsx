@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Store, MapPin, Phone, Mail, User } from 'lucide-react';
 import AuthLayout from '../../layouts/AuthLayout';
@@ -26,7 +26,7 @@ const RegisterRestaurant = () => {
         name: form.ownerName,
         email: form.businessEmail,
         password: form.password,
-        phone: Number(form.contactNumber.replace(/\D/g, '')) || 0,
+        phone: form.contactNumber.trim(),
         role: 'owner',
       });
       if (!signupRes.user || !signupRes.accessToken) {
@@ -37,8 +37,10 @@ const RegisterRestaurant = () => {
         name: form.restaurantName,
         description: `${form.restaurantName} - registered via SupaMeal`,
         ownerId: user.id,
+        // The form only collects a free-text address; coordinates stay 0
+        // until the owner sets a precise location from their dashboard.
         location: { address: form.fullAddress, city: 'Downtown', latitude: 0, longitude: 0 },
-        phone: Number(form.contactNumber.replace(/\D/g, '')) || 0,
+        phone: form.contactNumber.trim(),
         opening: 'Mon-Sun: 10:00 AM - 10:00 PM',
         capacity: 50,
         images: [],
