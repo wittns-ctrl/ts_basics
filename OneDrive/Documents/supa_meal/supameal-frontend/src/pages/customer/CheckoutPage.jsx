@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import { Suspense, useState, lazy, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Tag, Clock, CheckCircle, CreditCard, Loader2 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { ordersApi, promosApi, paymentsApi } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-import StripeCheckout from '../../components/StripeCheckout';
+// Stripe.js (~50 kB) is fetched only when the real-Stripe payment panel mounts
+const StripeCheckout = lazy(() => import('../../components/StripeCheckout'));
 import './dashboard.css';
 
 const TIME_SLOTS = ['ASAP (25-35 min)', '12:00 PM', '12:30 PM', '1:00 PM', '7:00 PM', '7:30 PM', '8:00 PM'];
@@ -119,7 +120,7 @@ const CheckoutPage = ({ setActiveTab }) => {
   };
 
   // Runs ONLY after Stripe Elements reports the intent as succeeded
-  const handleStripeSuccess = async (stripePaymentIntentId) => {
+  const handleStripeSuccess = useCallback(async (stripePaymentIntentId) => {
     const intentId = stripePaymentIntentId || pendingPayment?.paymentIntentId;
     if (!intentId) {
       showToast('Payment succeeded but no payment reference was returned', 'error');
@@ -141,18 +142,18 @@ const CheckoutPage = ({ setActiveTab }) => {
       setPendingPayment(null);
       showToast(err.message || 'Could not finalize your order after payment', 'error');
     }
-  };
+  }, [pendingPayment, showToast, clearCart]);
 
-  const handleStripeError = (message) => {
+  const handleStripeError = useCallback((message) => {
     // Keep the order + intent alive so the user can retry with another card —
     // the backend reuses the same pending intent on the next attempt.
     showToast(message || 'Payment failed. Please try again.', 'error');
-  };
+  }, [showToast]);
 
-  const handleCancelPayment = () => {
+  const handleCancelPayment = useCallback(() => {
     setPendingPayment(null);
     setPaymentState('idle');
-  };
+  }, []);
 
   if (placed) {
     return (
@@ -186,12 +187,14 @@ const CheckoutPage = ({ setActiveTab }) => {
           <p>Your order is reserved — finish the payment to confirm it.</p>
         </div>
         <div className="dash-panel" style={{ maxWidth: 520, margin: '0 auto' }}>
-          <StripeCheckout
-            publishableKey={pendingPayment.publishableKey}
-            clientSecret={pendingPayment.clientSecret}
-            onSuccess={handleStripeSuccess}
-            onError={handleStripeError}
-          />
+          <Suspense fallback={<p style={{ color: 'var(--dash-muted, #8a8a8a)' }}>Loading payment form…</p>}>
+            <StripeCheckout
+              publishableKey={pendingPayment.publishableKey}
+              clientSecret={pendingPayment.clientSecret}
+              onSuccess={handleStripeSuccess}
+              onError={handleStripeError}
+            />
+          </Suspense>
           <button
             className="dash-btn-outline"
             style={{ width: '100%', marginTop: '0.75rem' }}
